@@ -12,7 +12,7 @@ export default function useRoom() {
   const [joined, setJoined] = useState(false);
 
   const [userName, setUserName] = useState("");
-  const [language, setLanguage] = useState("javascript");
+  const [language, setLanguage] = useState("java");
   const [code, setCode] = useState("// Start coding...");
   const [users, setUsers] = useState([]);
 
@@ -41,7 +41,7 @@ export default function useRoom() {
     if (!session?.userName) return;
 
     setUserName(session.userName);
-    setLanguage(session.language || "javascript");
+    setLanguage(session.language || "java");
 
     socket.emit("join", {
       roomId,
@@ -83,8 +83,18 @@ export default function useRoom() {
   const updateCode = useCallback(
     (newCode) => {
       setCode(newCode);
-      socket.emit("codeChange", { roomId, code: newCode });
-      socket.emit("typing", { roomId, userName });
+
+      if (!socket.connected) return;
+
+      socket.emit("codeChange", {
+        roomId,
+        code: newCode,
+      });
+
+      socket.emit("typing", {
+        roomId,
+        userName,
+      });
     },
     [roomId, userName],
   );
