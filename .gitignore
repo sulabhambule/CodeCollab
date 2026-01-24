@@ -1,0 +1,20 @@
+# Node
+node_modules
+npm-debug.log
+yarn.lock
+pnpm-lock.yaml
+
+# Environment variables
+.env
+backend/.env
+
+# Build outputs
+dist
+frontend/dist
+
+# Vite
+frontend/.vite
+
+# OS
+.DS_Store
+Thumbs.db
