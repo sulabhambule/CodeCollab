@@ -12,88 +12,75 @@ export default function setupSocket(io) {
     console.log("User connected:", socket.id);
 
     // JOIN ROOM
+    // JOIN ROOM - "Safe" Version
     socket.on("join", async ({ roomId, userName }) => {
-      console.log(`User ${userName} (${socket.id}) joining room ${roomId}`);
-
-      // 🔥 Check if user is reconnecting (page refresh)
-      const pendingDisconnect = disconnectTimeouts.get(userName);
-      const isReconnecting = !!pendingDisconnect;
-
-      // CANCEL any pending disconnect timeout for this user
-      if (isReconnecting) {
+      try {
         console.log(
-          `Clearing disconnect timeout for ${userName} (page refresh detected)`,
+          `User ${userName} (${socket.id}) attempting to join room ${roomId}`,
         );
-        clearTimeout(pendingDisconnect.timeoutId);
-        disconnectTimeouts.delete(userName);
-      }
 
-      socket.join(roomId);
+        // 1. Check if user is reconnecting
+        const pendingDisconnect = disconnectTimeouts.get(userName);
+        if (pendingDisconnect) {
+          clearTimeout(pendingDisconnect.timeoutId);
+          disconnectTimeouts.delete(userName);
+        }
 
-      // Create room if not exists
-      await Room.updateOne(
-        { roomId },
-        {
-          $setOnInsert: {
+        socket.join(roomId);
+
+        // 2. Initialize Room (if it doesn't exist)
+        // We use findOneAndUpdate directly to handle creation atomically
+        let room = await Room.findOne({ roomId });
+
+        if (!room) {
+          console.log(`Creating new room: ${roomId}`);
+          room = await Room.create({
             roomId,
             code: "// Start coding...",
             language: "javascript",
-          },
-        },
-        { upsert: true },
-      );
+            users: [],
+          });
+        }
 
-      // 🔒 ATOMIC OPERATION: Remove ALL duplicates first, then add exactly once
-      // This prevents race conditions during rapid refreshes
-      const result = await Room.findOneAndUpdate(
-        { roomId },
-        {
-          $pull: {
-            users: {
-              $or: [{ socketId: socket.id }, { userName: userName }],
-            },
-          },
-        },
-        { new: false }, // Return document BEFORE update
-      );
+        // 3. Check if user is already in the list
+        const userIndex = room.users.findIndex((u) => u.userName === userName);
 
-      // Check if this user existed before removal
-      const userExistedBefore = result?.users?.some(
-        (u) => u.userName === userName,
-      );
+        if (userIndex !== -1) {
+          // Update existing user's socket ID
+          room.users[userIndex].socketId = socket.id;
+          console.log(`Updated socket ID for existing user: ${userName}`);
+        } else {
+          // Add new user
+          room.users.push({ socketId: socket.id, userName });
+          console.log(`Added new user: ${userName}`);
+        }
 
-      // Now add the user (guaranteed to be unique)
-      await Room.updateOne(
-        { roomId },
-        {
-          $push: {
-            users: { socketId: socket.id, userName },
-          },
-        },
-      );
+        // 4. Save the room
+        await room.save();
 
-      const room = await Room.findOne({ roomId });
-      console.log(`Room ${roomId} now has ${room.users.length} users`);
+        console.log(`Room ${roomId} now has ${room.users.length} users`);
 
-      // ✅ OPTIMIZED: Send full snapshot to the joining user
-      socket.emit("roomJoined", {
-        code: room.code,
-        language: room.language,
-        users: room.users,
-      });
+        // 5. Send success to the user
+        socket.emit("roomJoined", {
+          code: room.code,
+          language: room.language,
+          users: room.users,
+        });
 
-      // ✅ OPTIMIZED: Send delta update ONLY if truly new (not a reconnection)
-      // User is "new" if they had a pending timeout OR didn't exist before
-      const isTrulyNew = !isReconnecting && !userExistedBefore;
-
-      if (isTrulyNew) {
-        const newUser = { socketId: socket.id, userName };
-        socket.to(roomId).emit("user-joined", newUser);
-        console.log(`Broadcasting user-joined for ${userName} (new user)`);
-      } else {
-        console.log(
-          `Skipping user-joined broadcast for ${userName} (reconnection)`,
-        );
+        // 6. Broadcast to others
+        const isTrulyNew = !pendingDisconnect && userIndex === -1;
+        if (isTrulyNew) {
+          socket
+            .to(roomId)
+            .emit("user-joined", { socketId: socket.id, userName });
+        }
+      } catch (err) {
+        console.error("❌ CRITICAL ERROR in Join Handler:", err);
+        // Notify frontend so it doesn't hang on "Loading..."
+        socket.emit("roomJoined", {
+          error: true,
+          message: "Failed to join room. Please try again.",
+        });
       }
     });
 

@@ -12,9 +12,7 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-/* ======================================================
-   CORS (Express – REST + Socket handshake)
-   ====================================================== */
+/* CORS (Express – REST + Socket handshake) */
 const FRONTEND_URL = "https://code-collab-one-bay.vercel.app";
 
 app.use(
