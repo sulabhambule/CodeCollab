@@ -15,11 +15,12 @@ const server = http.createServer(app);
 /* ======================================================
    CORS (Express – REST + Socket handshake)
    ====================================================== */
-const FRONTEND_URL = "https://code-collab-sulabh-ambules-projects.vercel.app";
+const FRONTEND_URL = "https://code-collab-one-bay.vercel.app";
 
 app.use(
   cors({
     origin: FRONTEND_URL,
+    methods: ["GET", "POST"],
     credentials: true,
   }),
 );
@@ -35,7 +36,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true,
   },
-  transports: ["polling", "websocket"], // REQUIRED for Railway
+  transports: ["polling", "websocket"], // REQUIRED on Railway
 });
 
 setupSocket(io);
@@ -47,13 +48,17 @@ app.get("/", (req, res) => {
   res.send("Backend running 🚀");
 });
 
-/* Start Server */
+/* ======================================================
+   Start Server FIRST
+   ====================================================== */
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
-// Database (non-blocking, safe)
+/* ======================================================
+   Database (non-blocking, safe)
+   ====================================================== */
 connectDB()
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB connection failed:", err.message));
