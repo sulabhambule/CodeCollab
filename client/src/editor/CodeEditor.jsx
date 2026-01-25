@@ -1,7 +1,19 @@
 import Editor from "@monaco-editor/react";
+import { useEffect, useRef } from "react";
 
-export default function CodeEditor({ code, language, onChange }) {
+export default function CodeEditor({
+  code,
+  language,
+  onChange,
+  cursors = {},
+  userName,
+  onCursorChange,
+}) {
+  const editorRef = useRef(null);
+  const decorationsRef = useRef([]);
+
   const handleEditorDidMount = (editor, monaco) => {
+    editorRef.current = editor;
     // 🎨 Custom VS Code-like dark theme
     monaco.editor.defineTheme("custom-dark", {
       base: "vs-dark",
@@ -90,7 +102,151 @@ export default function CodeEditor({ code, language, onChange }) {
         return { suggestions };
       },
     });
+
+    // 📍 Track cursor position changes
+    editor.onDidChangeCursorPosition((e) => {
+      if (onCursorChange) {
+        const { lineNumber, column } = e.position;
+        onCursorChange({ line: lineNumber, column });
+      }
+    });
   };
+
+  // 🎨 Render remote cursors using Monaco's native decoration API
+  useEffect(() => {
+    if (!editorRef.current) return;
+
+    const editor = editorRef.current;
+    const monaco = window.monaco;
+    const decorations = [];
+    const widgets = [];
+
+    // User colors mapping (consistent colors for each user)
+    const getUserColor = (name) => {
+      const colors = [
+        "#FF6B6B", // Red
+        "#4ECDC4", // Teal
+        "#FFD93D", // Yellow
+        "#6BCF7F", // Green
+        "#A78BFA", // Purple
+        "#FB923C", // Orange
+        "#F472B6", // Pink
+        "#38BDF8", // Sky Blue
+      ];
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return colors[Math.abs(hash) % colors.length];
+    };
+
+    Object.entries(cursors).forEach(([cursorUserName, position]) => {
+      if (cursorUserName === userName) return; // Skip own cursor
+
+      const color = getUserColor(cursorUserName);
+      const { line, column } = position;
+
+      // ✨ Monaco's native cursor decoration with border
+      decorations.push({
+        range: new monaco.Range(line, column, line, column),
+        options: {
+          // Cursor line (vertical bar)
+          className: "remote-cursor-line",
+          // Inline style for colored border
+          before: {
+            content: "",
+            inlineClassName: "remote-cursor-bar",
+            cursorStops: monaco.editor.InjectedTextCursorStops.None,
+          },
+          // Style the decoration
+          inlineClassName: "remote-cursor-inline",
+          // Add to overview ruler (minimap)
+          overviewRuler: {
+            color: color,
+            position: monaco.editor.OverviewRulerLane.Full,
+          },
+          // Glyph margin (left side) indicator
+          glyphMarginClassName: "remote-cursor-glyph",
+          glyphMarginHoverMessage: { value: `**${cursorUserName}** is here` },
+          zIndex: 100,
+          stickiness:
+            monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+        },
+      });
+
+      // Create username label widget
+      const labelWidget = {
+        domNode: null,
+        getId: () => `cursor.${cursorUserName}.${line}.${column}`,
+        getDomNode: function () {
+          if (!this.domNode) {
+            this.domNode = document.createElement("div");
+            this.domNode.className = "remote-cursor-label";
+            this.domNode.style.cssText = `
+              background: ${color};
+              color: white;
+              padding: 3px 8px;
+              border-radius: 4px;
+              font-size: 11px;
+              font-weight: 600;
+              white-space: nowrap;
+              pointer-events: none;
+              box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            `;
+            this.domNode.textContent = cursorUserName;
+          }
+          return this.domNode;
+        },
+        getPosition: () => ({
+          position: { lineNumber: line, column: column },
+          preference: [
+            monaco.editor.ContentWidgetPositionPreference.ABOVE,
+            monaco.editor.ContentWidgetPositionPreference.BELOW,
+          ],
+        }),
+      };
+
+      editor.addContentWidget(labelWidget);
+      widgets.push(labelWidget);
+
+      // Add a thin vertical line as the actual cursor
+      const cursorWidget = {
+        domNode: null,
+        getId: () => `cursor.line.${cursorUserName}.${line}.${column}`,
+        getDomNode: function () {
+          if (!this.domNode) {
+            this.domNode = document.createElement("div");
+            this.domNode.style.cssText = `
+              width: 2px;
+              height: 20px;
+              background: ${color};
+              animation: cursor-blink 1s infinite;
+              pointer-events: none;
+            `;
+          }
+          return this.domNode;
+        },
+        getPosition: () => ({
+          position: { lineNumber: line, column: column },
+          preference: [monaco.editor.ContentWidgetPositionPreference.EXACT],
+        }),
+      };
+
+      editor.addContentWidget(cursorWidget);
+      widgets.push(cursorWidget);
+    });
+
+    // Apply decorations
+    decorationsRef.current = editor.deltaDecorations(
+      decorationsRef.current,
+      decorations,
+    );
+
+    // Cleanup widgets
+    return () => {
+      widgets.forEach((widget) => editor.removeContentWidget(widget));
+    };
+  }, [cursors, userName]);
 
   return (
     <Editor

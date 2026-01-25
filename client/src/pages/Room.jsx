@@ -11,6 +11,7 @@ export default function Room() {
     connected,
     joined,
     roomId,
+    userName,
     users,
     code,
     language,
@@ -22,6 +23,8 @@ export default function Room() {
     input,
     setInput,
     typingUser,
+    cursors,
+    updateCursor,
     leaveRoom,
   } = useRoom();
 
@@ -46,7 +49,14 @@ export default function Room() {
         />
 
         <div className="flex-1">
-          <CodeEditor code={code} language={language} onChange={updateCode} />
+          <CodeEditor
+            code={code}
+            language={language}
+            onChange={updateCode}
+            cursors={cursors}
+            userName={userName}
+            onCursorChange={updateCursor}
+          />
         </div>
 
         <Terminal output={output} input={input} setInput={setInput} />

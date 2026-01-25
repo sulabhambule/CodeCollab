@@ -12,7 +12,6 @@ export default function JoinPanel() {
   const [isJoining, setIsJoining] = useState(false);
   const navigate = useNavigate();
 
-  // CREATE ROOM (explicit)
   const handleGenerate = () => {
     const id = uuid().slice(0, 6).toUpperCase();
     setRoomId(id);

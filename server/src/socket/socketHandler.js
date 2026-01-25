@@ -156,6 +156,12 @@ export default function setupSocket(io) {
       io.to(roomId).emit("outputUpdate", { output, running, userName });
     });
 
+    // 📍 CURSOR POSITION UPDATE (BROADCAST TO OTHERS)
+    socket.on("cursorMove", ({ roomId, userName, position }) => {
+      // Broadcast to everyone EXCEPT sender
+      socket.to(roomId).emit("cursorUpdate", { userName, position });
+    });
+
     // CLEANUP (DO NOT DELETE ROOM)
     const cleanup = async () => {
       console.log(`Cleaning up socket ${socket.id}`);
@@ -240,6 +246,9 @@ export default function setupSocket(io) {
         // 5️⃣ OPTIMIZED: Send delta update (only removed user) to others
         io.to(disconnectRoomId).emit("user-left", userName);
 
+        // 🔹 Remove cursor for this user
+        io.to(disconnectRoomId).emit("cursorRemove", { userName });
+
         // 6️⃣ Clean up typing status
         if (typingUsers.has(disconnectRoomId)) {
           typingUsers.get(disconnectRoomId).delete(userName);
@@ -305,6 +314,9 @@ export default function setupSocket(io) {
 
       // 📢 Notify everyone immediately
       io.to(room.roomId).emit("user-left", userName);
+
+      // 🔹 Remove cursor for this user
+      io.to(room.roomId).emit("cursorRemove", { userName });
 
       // Clean up typing status
       if (typingUsers.has(room.roomId)) {

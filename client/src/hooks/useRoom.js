@@ -19,38 +19,78 @@ export default function useRoom() {
   const [typingUser, setTypingUser] = useState("");
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
-  const [input, setInput] = useState(""); // 🟢 New state for stdin input
+  const [input, setInput] = useState("");
+  const [cursors, setCursors] = useState({}); // {userName: {line, column, color}}
 
   const typingTimerRef = useRef(null);
-  const joinedRef = useRef(false); // 🔒 prevents double join
+  const joinedRef = useRef(false); // prevents double join
   const codeUpdateTimerRef = useRef(null); // For debouncing code updates
 
-  // 🎯 OPTIMIZED: Typing indicator throttling
-  const lastTypingEmitRef = useRef(0); // Timestamp of last "typing" emit
-  const stopTypingTimerRef = useRef(null); // Timer for "stop-typing" event
-  const isTypingRef = useRef(false); // Track if we're currently marked as typing
+  const lastTypingEmitRef = useRef(0);
+  const stopTypingTimerRef = useRef(null);
+  const isTypingRef = useRef(false);
+
+  // ⚡ CONNECTION RECOVERY & OPTIMIZATION
+  const pendingUpdates = useRef([]);
+  const reconnectAttempts = useRef(0);
+  const lastCodeRef = useRef(""); // Track last code for diff optimization
+  const lastCursorEmitRef = useRef(0); // Throttle cursor updates
 
   // ---- SOCKET CONNECT (ONCE) ----
   useEffect(() => {
     if (!socket.connected) socket.connect();
 
     const onConnect = () => {
-      console.log("Socket connected");
+      console.log("✅ Socket connected");
       setConnected(true);
+      reconnectAttempts.current = 0;
+
+      // ⚡ RECOVERY: Resend pending updates after reconnection
+      if (pendingUpdates.current.length > 0) {
+        console.log(
+          `🔄 Resending ${pendingUpdates.current.length} pending updates`,
+        );
+        pendingUpdates.current.forEach((update) => {
+          socket.emit(update.event, update.data);
+        });
+        pendingUpdates.current = [];
+      }
     };
 
-    const onDisconnect = () => {
-      console.log("Socket disconnected");
+    const onDisconnect = (reason) => {
+      console.log("🔌 Socket disconnected:", reason);
       setConnected(false);
       joinedRef.current = false; // Reset join state on disconnect
+
+      // Auto-reconnect with exponential backoff (max 3 attempts)
+      if (reason === "io server disconnect") {
+        // Server disconnected us, reconnect manually
+        if (reconnectAttempts.current < 3) {
+          const delay = Math.min(
+            1000 * Math.pow(2, reconnectAttempts.current),
+            5000,
+          );
+          console.log(`🔄 Reconnecting in ${delay}ms...`);
+          setTimeout(() => {
+            reconnectAttempts.current++;
+            socket.connect();
+          }, delay);
+        }
+      }
+    };
+
+    const onConnectError = (error) => {
+      console.error("❌ Connection error:", error.message);
     };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
     };
   }, []);
 
@@ -132,7 +172,21 @@ export default function useRoom() {
       setRunning(running);
     };
 
-    // Remove any existing listeners before adding new ones
+    const handleCursorUpdate = ({ userName: cursorUserName, position }) => {
+      setCursors((prev) => ({
+        ...prev,
+        [cursorUserName]: position,
+      }));
+    };
+
+    const handleCursorRemove = ({ userName: cursorUserName }) => {
+      setCursors((prev) => {
+        const updated = { ...prev };
+        delete updated[cursorUserName];
+        return updated;
+      });
+    };
+
     socket.off("roomJoined");
     socket.off("codeUpdate");
     socket.off("languageUpdate");
@@ -142,6 +196,8 @@ export default function useRoom() {
     socket.off("user-typing");
     socket.off("user-stopped-typing");
     socket.off("outputUpdate");
+    socket.off("cursorUpdate");
+    socket.off("cursorRemove");
 
     socket.on("roomJoined", handleRoomJoined);
     socket.on("codeUpdate", handleCodeUpdate);
@@ -152,6 +208,8 @@ export default function useRoom() {
     socket.on("user-typing", handleUserTyping);
     socket.on("user-stopped-typing", handleUserStoppedTyping);
     socket.on("outputUpdate", handleOutputUpdate);
+    socket.on("cursorUpdate", handleCursorUpdate);
+    socket.on("cursorRemove", handleCursorRemove);
 
     return () => {
       socket.off("roomJoined", handleRoomJoined);
@@ -163,14 +221,28 @@ export default function useRoom() {
       socket.off("user-typing", handleUserTyping);
       socket.off("user-stopped-typing", handleUserStoppedTyping);
       socket.off("outputUpdate", handleOutputUpdate);
+      socket.off("cursorUpdate", handleCursorUpdate);
+      socket.off("cursorRemove", handleCursorRemove);
     };
   }, []);
 
   // ---- ACTIONS ----
   const updateCode = useCallback(
     (newCode) => {
+      // ⚡ OPTIMISTIC UPDATE: Update UI immediately
       setCode(newCode);
-      if (!socket.connected) return;
+      if (!socket.connected) {
+        // Queue update for when connection is restored
+        pendingUpdates.current.push({
+          event: "codeChange",
+          data: { roomId, code: newCode },
+        });
+        return;
+      }
+
+      // 🎯 OPTIMIZATION: Only send if code actually changed
+      if (newCode === lastCodeRef.current) return;
+      lastCodeRef.current = newCode;
 
       // Debounce code updates to reduce lag
       clearTimeout(codeUpdateTimerRef.current);
@@ -208,8 +280,6 @@ export default function useRoom() {
 
   const leaveRoom = () => {
     console.log("Leaving room");
-
-    // Emit stop-typing before leaving
     if (isTypingRef.current) {
       socket.emit("stop-typing", { roomId, userName });
       isTypingRef.current = false;
@@ -254,12 +324,24 @@ export default function useRoom() {
     });
 
     try {
-      const res = await axios.post("https://emkc.org/api/v2/piston/execute", {
-        language,
-        version: "*",
-        files: [{ content: code }],
-        stdin: input, // 🟢 Send user input to Piston API
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      const res = await axios.post(
+        "https://emkc.org/api/v2/piston/execute",
+        {
+          language,
+          version: "*",
+          files: [{ content: code }],
+          stdin: input, // 🟢 Send user input to Piston API
+        },
+        {
+          signal: controller.signal,
+          timeout: 10000,
+        },
+      );
+
+      clearTimeout(timeoutId);
 
       const outputMsg =
         res.data.run.output || res.data.run.stderr || "No output";
@@ -272,8 +354,18 @@ export default function useRoom() {
         running: false,
         userName,
       });
-    } catch {
-      const errorMsg = "Execution error";
+    } catch (error) {
+      let errorMsg = "Execution error";
+
+      if (error.code === "ECONNABORTED" || error.name === "AbortError") {
+        errorMsg = "⏱️ Execution timeout (10s limit exceeded)";
+      } else if (error.response) {
+        errorMsg = `❌ Server error: ${error.response.status}`;
+      } else if (error.request) {
+        errorMsg = "🚫 Network error - check your connection";
+      }
+
+      console.error("Code execution error:", error);
       setOutput(errorMsg);
 
       // Broadcast error to all users
@@ -288,6 +380,22 @@ export default function useRoom() {
     }
   };
 
+  // ⚡ THROTTLED CURSOR UPDATE (max 10 updates/sec)
+  const updateCursor = useCallback(
+    (position) => {
+      if (!socket.connected || !joined) return;
+
+      const now = Date.now();
+      const CURSOR_THROTTLE = 100; // 100ms = 10 updates/sec
+
+      if (now - lastCursorEmitRef.current >= CURSOR_THROTTLE) {
+        socket.emit("cursorMove", { roomId, userName, position });
+        lastCursorEmitRef.current = now;
+      }
+    },
+    [roomId, userName, joined],
+  );
+
   return {
     connected,
     joined,
@@ -301,10 +409,12 @@ export default function useRoom() {
     running,
     input, // Export input
     setInput, // Export input setter
+    cursors, // Export cursor positions
 
     updateCode,
     updateLanguage,
     runCode,
     leaveRoom,
+    updateCursor, // Export cursor update function
   };
 }
