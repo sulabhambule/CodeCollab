@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-const socket = io("https://codecollab-production-e4e3.up.railway.app", {
+const socket = io("https://codecollab-production-cb77.up.railway.app/", {
   autoConnect: false,
 
   // ✅ polling first (mandatory for handshake), then websocket

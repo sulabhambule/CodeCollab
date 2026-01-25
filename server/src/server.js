@@ -23,8 +23,7 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: allowedOrigins,
-  methods: ["GET", "POST"],
-  credentials: true, // Required for cookies/headers
+  credentials: true,
 };
 
 // Apply to Express
