@@ -1,11 +1,11 @@
 import { io } from "socket.io-client";
 
-// backend server URL
-const SERVER_URL = "https://codecollab-production-e4e3.up.railway.app";
-
-const socket = io(SERVER_URL, {
-  autoConnect: false,
-  transports: ["websocket"],
-});
+const socket = io(
+  "https://codecollab-production-e4e3.up.railway.app",
+  {
+    autoConnect: false,
+    transports: ["polling", "websocket"], // IMPORTANT ORDER
+  }
+);
 
 export default socket;

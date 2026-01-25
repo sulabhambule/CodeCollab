@@ -23,17 +23,10 @@ app.use(express.json());
 // --------------------
 const io = new Server(server, {
   cors: {
-    origin: [
-      "http://localhost:5173", // local frontend
-      "https://code-collab-sulabh-ambules-projects.vercel.app/",
-      "*",
-    ],
+    origin: "*",
     methods: ["GET", "POST"],
-    credentials: true,
   },
-
-  // 🔑 CRITICAL for Railway
-  transports: ["websocket"],
+  transports: ["polling", "websocket"],
 });
 
 setupSocket(io);
