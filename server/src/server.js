@@ -12,29 +12,31 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-/* CORS (Express – REST + Socket handshake) */
-const FRONTEND_URL = "https://code-collab-one-bay.vercel.app";
+/* ======================================================
+   CORS Configuration (Allow Prod + Localhost)
+   ====================================================== */
+const allowedOrigins = [
+  "https://code-collab-one-bay.vercel.app", // Production
+  "http://localhost:5173", // Local React/Vite (adjust port if needed)
+  "http://localhost:3000", // Local generic
+];
 
-app.use(
-  cors({
-    origin: FRONTEND_URL,
-    methods: ["GET", "POST"],
-    credentials: true,
-  }),
-);
+const corsOptions = {
+  origin: allowedOrigins,
+  methods: ["GET", "POST"],
+  credentials: true, // Required for cookies/headers
+};
 
+// Apply to Express
+app.use(cors(corsOptions));
 app.use(express.json());
 
 /* ======================================================
    Socket.IO
    ====================================================== */
 const io = new Server(server, {
-  cors: {
-    origin: FRONTEND_URL,
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-  transports: ["polling", "websocket"], // REQUIRED on Railway
+  cors: corsOptions, // Reuse the same options
+  transports: ["polling", "websocket"],
 });
 
 setupSocket(io);
@@ -47,15 +49,17 @@ app.get("/", (req, res) => {
 });
 
 /* ======================================================
-   Start Server FIRST
+   Start Server
    ====================================================== */
 const PORT = process.env.PORT || 8080;
+
+// ✅ 0.0.0.0 is crucial for Railway to expose the port
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
 /* ======================================================
-   Database (non-blocking, safe)
+   Database
    ====================================================== */
 connectDB()
   .then(() => console.log("✅ MongoDB connected"))
