@@ -8,12 +8,10 @@ const roomSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
-
     code: {
       type: String,
       default: "// Start coding...",
     },
-
     language: {
       type: String,
       enum: ["javascript", "python", "java", "cpp"],

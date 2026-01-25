@@ -30,22 +30,19 @@ export default function useRoom() {
   const stopTypingTimerRef = useRef(null);
   const isTypingRef = useRef(false);
 
-  // ⚡ CONNECTION RECOVERY & OPTIMIZATION
   const pendingUpdates = useRef([]);
   const reconnectAttempts = useRef(0);
-  const lastCodeRef = useRef(""); // Track last code for diff optimization
-  const lastCursorEmitRef = useRef(0); // Throttle cursor updates
+  const lastCodeRef = useRef(""); 
+  const lastCursorEmitRef = useRef(0); 
 
-  // ---- SOCKET CONNECT (ONCE) ----
   useEffect(() => {
     if (!socket.connected) socket.connect();
 
     const onConnect = () => {
-      console.log("✅ Socket connected");
+      console.log(" Socket connected");
       setConnected(true);
       reconnectAttempts.current = 0;
 
-      // ⚡ RECOVERY: Resend pending updates after reconnection
       if (pendingUpdates.current.length > 0) {
         console.log(
           `🔄 Resending ${pendingUpdates.current.length} pending updates`,
@@ -58,7 +55,7 @@ export default function useRoom() {
     };
 
     const onDisconnect = (reason) => {
-      console.log("🔌 Socket disconnected:", reason);
+      console.log("Socket disconnected:", reason);
       setConnected(false);
       joinedRef.current = false; // Reset join state on disconnect
 
@@ -80,7 +77,7 @@ export default function useRoom() {
     };
 
     const onConnectError = (error) => {
-      console.error("❌ Connection error:", error.message);
+      console.error("Connection error:", error.message);
     };
 
     socket.on("connect", onConnect);
@@ -94,7 +91,6 @@ export default function useRoom() {
     };
   }, []);
 
-  // ---- JOIN ROOM (SAFE & IDEMPOTENT) ----
   useEffect(() => {
     const session = getSession();
     if (!session?.userName) return;
@@ -136,13 +132,11 @@ export default function useRoom() {
       setUsers(updatedUsers);
     };
 
-    // ✅ OPTIMIZED: Delta update - add single user
     const handleUserJoined = (newUser) => {
       console.log("User joined:", newUser.userName);
       setUsers((prev) => [...prev, newUser]);
     };
 
-    // ✅ OPTIMIZED: Delta update - remove single user
     const handleUserLeft = (userName) => {
       console.log("User left:", userName);
       setUsers((prev) => prev.filter((u) => u.userName !== userName));
@@ -226,13 +220,10 @@ export default function useRoom() {
     };
   }, []);
 
-  // ---- ACTIONS ----
   const updateCode = useCallback(
     (newCode) => {
-      // ⚡ OPTIMISTIC UPDATE: Update UI immediately
       setCode(newCode);
       if (!socket.connected) {
-        // Queue update for when connection is restored
         pendingUpdates.current.push({
           event: "codeChange",
           data: { roomId, code: newCode },
@@ -240,17 +231,14 @@ export default function useRoom() {
         return;
       }
 
-      // 🎯 OPTIMIZATION: Only send if code actually changed
       if (newCode === lastCodeRef.current) return;
       lastCodeRef.current = newCode;
 
-      // Debounce code updates to reduce lag
       clearTimeout(codeUpdateTimerRef.current);
       codeUpdateTimerRef.current = setTimeout(() => {
         socket.emit("codeChange", { roomId, code: newCode });
-      }, 300); // Wait 300ms after user stops typing
+      }, 300); 
 
-      // ✅ OPTIMIZED: Throttled typing indicator (emit max once per 2 seconds)
       const now = Date.now();
       const TYPING_THROTTLE = 2000; // 2 seconds
       const STOP_TYPING_DELAY = 1500; // 1.5 seconds
@@ -358,17 +346,16 @@ export default function useRoom() {
       let errorMsg = "Execution error";
 
       if (error.code === "ECONNABORTED" || error.name === "AbortError") {
-        errorMsg = "⏱️ Execution timeout (10s limit exceeded)";
+        errorMsg = "Execution timeout (10s limit exceeded)";
       } else if (error.response) {
-        errorMsg = `❌ Server error: ${error.response.status}`;
+        errorMsg = ` Server error: ${error.response.status}`;
       } else if (error.request) {
-        errorMsg = "🚫 Network error - check your connection";
+        errorMsg = " Network error - check your connection";
       }
 
       console.error("Code execution error:", error);
       setOutput(errorMsg);
 
-      // Broadcast error to all users
       socket.emit("codeExecution", {
         roomId,
         output: errorMsg,
@@ -380,7 +367,6 @@ export default function useRoom() {
     }
   };
 
-  // ⚡ THROTTLED CURSOR UPDATE (max 10 updates/sec)
   const updateCursor = useCallback(
     (position) => {
       if (!socket.connected || !joined) return;

@@ -1,17 +1,11 @@
 import Room from "../models/Room.js";
 
-// 🕒 Store for graceful disconnect timeouts (userName -> {timeoutId, roomId})
 const disconnectTimeouts = new Map();
-
-// 🎯 Store for typing status tracking (roomId -> Set<userName>)
-// Prevents redundant "user is typing" broadcasts
 const typingUsers = new Map();
 
 export default function setupSocket(io) {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
-
-    // JOIN ROOM
     // JOIN ROOM - "Safe" Version
     socket.on("join", async ({ roomId, userName }) => {
       try {
@@ -19,7 +13,6 @@ export default function setupSocket(io) {
           `User ${userName} (${socket.id}) attempting to join room ${roomId}`,
         );
 
-        // 1. Check if user is reconnecting
         const pendingDisconnect = disconnectTimeouts.get(userName);
         if (pendingDisconnect) {
           clearTimeout(pendingDisconnect.timeoutId);
@@ -27,9 +20,7 @@ export default function setupSocket(io) {
         }
 
         socket.join(roomId);
-
         // 2. Initialize Room (if it doesn't exist)
-        // We use findOneAndUpdate directly to handle creation atomically
         let room = await Room.findOne({ roomId });
 
         if (!room) {
@@ -54,10 +45,7 @@ export default function setupSocket(io) {
           room.users.push({ socketId: socket.id, userName });
           console.log(`Added new user: ${userName}`);
         }
-
-        // 4. Save the room
         await room.save();
-
         console.log(`Room ${roomId} now has ${room.users.length} users`);
 
         // 5. Send success to the user
@@ -66,8 +54,6 @@ export default function setupSocket(io) {
           language: room.language,
           users: room.users,
         });
-
-        // 6. Broadcast to others
         const isTrulyNew = !pendingDisconnect && userIndex === -1;
         if (isTrulyNew) {
           socket
@@ -75,8 +61,7 @@ export default function setupSocket(io) {
             .emit("user-joined", { socketId: socket.id, userName });
         }
       } catch (err) {
-        console.error("❌ CRITICAL ERROR in Join Handler:", err);
-        // Notify frontend so it doesn't hang on "Loading..."
+        console.error("CRITICAL ERROR in Join Handler:", err);
         socket.emit("roomJoined", {
           error: true,
           message: "Failed to join room. Please try again.",
@@ -86,23 +71,17 @@ export default function setupSocket(io) {
 
     // CODE CHANGE (REALTIME + DB)
     socket.on("codeChange", async ({ roomId, code }) => {
-      // Save latest code
       await Room.updateOne({ roomId }, { $set: { code } });
-
-      // Broadcast to others
       socket.to(roomId).emit("codeUpdate", code);
     });
 
-    // LANGUAGE CHANGE
     socket.on("languageChange", async ({ roomId, language }) => {
       await Room.updateOne({ roomId }, { $set: { language } });
 
       io.to(roomId).emit("languageUpdate", language);
     });
 
-    // ✅ OPTIMIZED TYPING INDICATOR (with redundancy prevention)
     socket.on("typing", ({ roomId, userName }) => {
-      // Initialize Set for this room if not exists
       if (!typingUsers.has(roomId)) {
         typingUsers.set(roomId, new Set());
       }
@@ -117,7 +96,6 @@ export default function setupSocket(io) {
       }
     });
 
-    // ✅ STOP TYPING INDICATOR
     socket.on("stop-typing", ({ roomId, userName }) => {
       if (!typingUsers.has(roomId)) return;
 
@@ -136,16 +114,12 @@ export default function setupSocket(io) {
       }
     });
 
-    // CODE EXECUTION OUTPUT (BROADCAST TO ALL)
     socket.on("codeExecution", ({ roomId, output, running, userName }) => {
       console.log(`Code execution by ${userName} in room ${roomId}`);
-      // Broadcast to ALL users in the room (including sender)
       io.to(roomId).emit("outputUpdate", { output, running, userName });
     });
 
-    // 📍 CURSOR POSITION UPDATE (BROADCAST TO OTHERS)
     socket.on("cursorMove", ({ roomId, userName, position }) => {
-      // Broadcast to everyone EXCEPT sender
       socket.to(roomId).emit("cursorUpdate", { userName, position });
     });
 
@@ -171,12 +145,11 @@ export default function setupSocket(io) {
       }
 
       const { userName } = user;
-      const socketId = socket.id; // Capture socket ID for verification
+      const socketId = socket.id;
       console.log(`User ${userName} disconnecting from room ${room.roomId}`);
 
-      // 🕒 GRACEFUL DISCONNECT: Set a timeout instead of immediate removal
-      const DISCONNECT_DELAY = 30000; // Increased to 30s to be safe
-      const disconnectRoomId = room.roomId; // Capture in closure
+      const DISCONNECT_DELAY = 30000;
+      const disconnectRoomId = room.roomId;
 
       // Cancel any existing timeout for this user
       if (disconnectTimeouts.has(userName)) {
@@ -185,9 +158,7 @@ export default function setupSocket(io) {
         console.log(`Cancelled previous timeout for ${userName}`);
       }
 
-      // Schedule removal after delay
       const timeoutId = setTimeout(async () => {
-        // 1️⃣ Verify this timeout matches the current pending one
         const currentTimeout = disconnectTimeouts.get(userName);
         if (!currentTimeout || currentTimeout.timeoutId !== timeoutId) {
           console.log(
@@ -196,8 +167,6 @@ export default function setupSocket(io) {
           return;
         }
 
-        // 2️⃣ SAFEGUARD: Check if user has reconnected with a NEW socket
-        // Check DB to see if the current user's socketId matches the one that disconnected
         const checkRoom = await Room.findOne({ roomId: disconnectRoomId });
         const currentUser = checkRoom?.users?.find(
           (u) => u.userName === userName,
@@ -255,11 +224,10 @@ export default function setupSocket(io) {
       socket.leave(room.roomId);
     };
 
-    // 🚪 INSTANT REMOVAL when user explicitly leaves
     const instantCleanup = async () => {
       console.log(`User explicitly leaving (socket ${socket.id})`);
 
-      // 1️⃣ Find the room where this socket exists
+      // 1️⃣ Find the room where this socket exist
       const room = await Room.findOne({
         "users.socketId": socket.id,
       });
@@ -279,7 +247,6 @@ export default function setupSocket(io) {
       const { userName } = user;
       console.log(`User ${userName} explicitly leaving room ${room.roomId}`);
 
-      // 🔥 Cancel any pending disconnect timeout
       if (disconnectTimeouts.has(userName)) {
         const existing = disconnectTimeouts.get(userName);
         clearTimeout(existing.timeoutId);
@@ -287,25 +254,21 @@ export default function setupSocket(io) {
         console.log(`Cancelled pending timeout for ${userName}`);
       }
 
-      // ⚡ INSTANT REMOVAL (no timeout)
       await Room.updateOne(
         { roomId: room.roomId },
         { $pull: { users: { userName } } },
       );
 
-      // Fetch updated users list
       const updatedRoom = await Room.findOne({ roomId: room.roomId });
       console.log(
         `Room ${room.roomId} now has ${updatedRoom.users.length} users after instant cleanup`,
       );
 
-      // 📢 Notify everyone immediately
       io.to(room.roomId).emit("user-left", userName);
 
       // 🔹 Remove cursor for this user
       io.to(room.roomId).emit("cursorRemove", { userName });
 
-      // Clean up typing status
       if (typingUsers.has(room.roomId)) {
         typingUsers.get(room.roomId).delete(userName);
       }
