@@ -1,12 +1,12 @@
 import { io } from "socket.io-client";
 
 // backend server URL
-const SERVER_URL = "http://localhost:5000";
+const SERVER_URL = "https://codecollab-production-e4e3.up.railway.app";
 
 // create socket instance (singleton) with optimized settings
 const socket = io(SERVER_URL, {
   autoConnect: false,
-  path: "/socket.io", // Explicit path
+  // path: "/socket.io", 
   transports: ["websocket", "polling"], // Try websocket first, fallback to polling
 
   // ⚡ OPTIMIZATION: Connection & reconnection settings
