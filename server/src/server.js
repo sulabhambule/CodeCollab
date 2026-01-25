@@ -12,43 +12,48 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// --------------------
-// Middleware
-// --------------------
-app.use(cors());
+/* ======================================================
+   CORS (Express – REST + Socket handshake)
+   ====================================================== */
+const FRONTEND_URL = "https://code-collab-sulabh-ambules-projects.vercel.app";
+
+app.use(
+  cors({
+    origin: FRONTEND_URL,
+    credentials: true,
+  }),
+);
+
 app.use(express.json());
 
-// --------------------
-// Socket.IO
-// --------------------
+/* ======================================================
+   Socket.IO
+   ====================================================== */
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: FRONTEND_URL,
     methods: ["GET", "POST"],
+    credentials: true,
   },
-  transports: ["polling", "websocket"],
+  transports: ["polling", "websocket"], // REQUIRED for Railway
 });
 
 setupSocket(io);
 
-// --------------------
-// Routes
-// --------------------
+/* ======================================================
+   Routes
+   ====================================================== */
 app.get("/", (req, res) => {
   res.send("Backend running 🚀");
 });
 
-// --------------------
-// Start server FIRST
-// --------------------
-const PORT = process.env.PORT || 5000;
+/* Start Server */
+const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
-// --------------------
-// Connect DB (async, non-blocking)
-// --------------------
+// Database (non-blocking, safe)
 connectDB()
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB connection failed:", err.message));
