@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
-import Room from "./pages/Room";
 import Background from "./components/Background";
+import Room from "./pages/Room";
 
 function App() {
   return (

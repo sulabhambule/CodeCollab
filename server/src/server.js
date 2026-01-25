@@ -26,13 +26,15 @@ async function startServer() {
   console.log("✅ MongoDB connected");
 
   // --------------------
-  // Socket.IO
+  // Socket.IO (for control events)
   // --------------------
   const io = new Server(server, {
     cors: {
       origin: "*", // later: frontend URL
       methods: ["GET", "POST"],
     },
+    path: "/socket.io", // Explicit path for Socket.io
+    transports: ["websocket", "polling"],
   });
 
   setupSocket(io);

@@ -2,10 +2,14 @@ import Sidebar from "../components/Sidebar";
 import Toolbar from "../components/Toolbar";
 import Terminal from "../components/Terminal";
 import CodeEditor from "../editor/CodeEditor";
+import Navbar from "../components/Navbar";
+import { LoadingOverlay } from "../components/Loading";
 import useRoom from "../hooks/useRoom";
 
 export default function Room() {
   const {
+    connected,
+    joined,
     roomId,
     users,
     code,
@@ -15,12 +19,21 @@ export default function Room() {
     runCode,
     output,
     running,
+    input,
+    setInput,
     typingUser,
     leaveRoom,
   } = useRoom();
 
+  // Show loading while joining room
+  if (!joined) {
+    return <LoadingOverlay message="Joining room..." />;
+  }
+
   return (
-    <div className="flex h-screen bg-[#0b0f1a] text-white overflow-hidden">
+    <div className="flex h-screen bg-[#0b0f1a] text-white overflow-hidden pt-14">
+      <Navbar typingUser={typingUser} />
+
       <Sidebar roomId={roomId} users={users} onLeave={leaveRoom} />
 
       <div className="flex-1 flex flex-col">
@@ -30,14 +43,13 @@ export default function Room() {
           onLanguageChange={updateLanguage}
           onRun={runCode}
           running={running}
-          typingUser={typingUser}
         />
 
         <div className="flex-1">
           <CodeEditor code={code} language={language} onChange={updateCode} />
         </div>
 
-        <Terminal output={output} />
+        <Terminal output={output} input={input} setInput={setInput} />
       </div>
     </div>
   );

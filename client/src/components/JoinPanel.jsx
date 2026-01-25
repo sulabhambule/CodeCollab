@@ -3,11 +3,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveSession } from "../storage/session";
 import { v4 as uuid } from "uuid";
+import { Spinner } from "./Loading";
 
 export default function JoinPanel() {
   const [roomId, setRoomId] = useState("");
   const [userName, setUserName] = useState("");
-  const [language, setLanguage] = useState("javascript");
+  const [language, setLanguage] = useState("java");
+  const [isJoining, setIsJoining] = useState(false);
   const navigate = useNavigate();
 
   // CREATE ROOM (explicit)
@@ -23,8 +25,13 @@ export default function JoinPanel() {
       return;
     }
 
+    setIsJoining(true);
     saveSession({ roomId, userName, language });
-    navigate(`/room/${roomId}`);
+
+    // Small delay for smooth transition
+    setTimeout(() => {
+      navigate(`/room/${roomId}`);
+    }, 300);
   };
 
   return (
@@ -70,9 +77,17 @@ export default function JoinPanel() {
       {/* Start */}
       <button
         onClick={handleStart}
-        className="w-full py-2 rounded bg-indigo-600 hover:bg-indigo-700 transition"
+        disabled={isJoining}
+        className="w-full py-2 rounded bg-indigo-600 hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        Start Session →
+        {isJoining ? (
+          <>
+            <Spinner size="sm" />
+            <span>Joining...</span>
+          </>
+        ) : (
+          <span>Start Session →</span>
+        )}
       </button>
     </div>
   );

@@ -1,12 +1,35 @@
-export default function Navbar() {
+export default function Navbar({ typingUser }) {
   return (
-    <nav className="fixed top-0 left-0 w-full z-20">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <nav className="fixed top-0 left-0 w-full z-20 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700">
+      <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2 text-lg font-bold">
           <span className="text-indigo-400">&lt;/&gt;</span>
           CodeCollab
         </div>
+
+        {/* Center - Typing Indicator */}
+        {typingUser && (
+          <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+            <div className="flex gap-1">
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              />
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce"
+                style={{ animationDelay: "150ms" }}
+              />
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce"
+                style={{ animationDelay: "300ms" }}
+              />
+            </div>
+            <span className="text-sm text-indigo-300">
+              <strong>{typingUser}</strong> is typing...
+            </span>
+          </div>
+        )}
 
         {/* Right actions */}
         <div className="flex items-center gap-4">
