@@ -4,7 +4,7 @@ import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
 
-import connectDb from "./db/connectDb.js";
+import connectDB from "./db/connectDb.js";
 import setupSocket from "./socket/socketHandler.js";
 
 dotenv.config();
@@ -22,7 +22,7 @@ async function startServer() {
   // --------------------
   // Database
   // --------------------
-  await connectDb();
+  await connectDB();
   console.log("✅ MongoDB connected");
 
   // --------------------
