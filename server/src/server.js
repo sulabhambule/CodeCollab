@@ -4,7 +4,7 @@ import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
 
-import connectDB from "./db/connectDb.js";
+import connectDB from "./db/connectDB.js";
 import setupSocket from "./socket/socketHandler.js";
 
 dotenv.config();
