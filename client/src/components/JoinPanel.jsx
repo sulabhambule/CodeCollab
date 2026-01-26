@@ -34,20 +34,25 @@ export default function JoinPanel() {
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl p-6 shadow-xl">
-      <h2 className="text-xl font-semibold mb-4">Initialize Workspace</h2>
+    <div className="relative bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl overflow-hidden transition-all duration-300 hover:shadow-indigo-500/20 hover:border-white/30">
+      {/* Subtle gradient overlay */}
+      <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl -z-10"></div>
+
+      <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+        Initialize Workspace
+      </h2>
 
       {/* Room ID */}
-      <div className="flex gap-2 mb-3">
+      <div className="flex gap-3 mb-4">
         <input
-          className="flex-1 px-3 py-2 rounded bg-gray-900 border border-gray-700"
+          className="flex-1 px-4 py-3 rounded-lg bg-gray-900/80 border border-gray-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all duration-200 text-white placeholder:text-gray-500"
           placeholder="Room ID"
           value={roomId}
           onChange={(e) => setRoomId(e.target.value.toUpperCase())}
         />
         <button
           onClick={handleGenerate}
-          className="px-3 rounded bg-gray-800 hover:bg-gray-700 text-sm"
+          className="px-5 py-3 rounded-lg bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 border border-gray-700 hover:border-gray-600 text-sm font-medium transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95"
         >
           Generate
         </button>
@@ -55,7 +60,7 @@ export default function JoinPanel() {
 
       {/* Name */}
       <input
-        className="w-full mb-3 px-3 py-2 rounded bg-gray-900 border border-gray-700"
+        className="w-full mb-4 px-4 py-3 rounded-lg bg-gray-900/80 border border-gray-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all duration-200 text-white placeholder:text-gray-500"
         placeholder="Your Name"
         value={userName}
         onChange={(e) => setUserName(e.target.value)}
@@ -63,7 +68,7 @@ export default function JoinPanel() {
 
       {/* Language */}
       <select
-        className="w-full mb-4 px-3 py-2 rounded bg-gray-900 border border-gray-700"
+        className="w-full mb-6 px-4 py-3 rounded-lg bg-gray-900/80 border border-gray-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all duration-200 text-white cursor-pointer"
         value={language}
         onChange={(e) => setLanguage(e.target.value)}
       >
@@ -77,7 +82,7 @@ export default function JoinPanel() {
       <button
         onClick={handleStart}
         disabled={isJoining}
-        className="w-full py-2 rounded bg-indigo-600 hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-3.5 rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98]"
       >
         {isJoining ? (
           <>
