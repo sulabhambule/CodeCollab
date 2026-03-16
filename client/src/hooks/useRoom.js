@@ -32,8 +32,8 @@ export default function useRoom() {
 
   const pendingUpdates = useRef([]);
   const reconnectAttempts = useRef(0);
-  const lastCodeRef = useRef(""); 
-  const lastCursorEmitRef = useRef(0); 
+  const lastCodeRef = useRef("");
+  const lastCursorEmitRef = useRef(0);
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
@@ -237,7 +237,7 @@ export default function useRoom() {
       clearTimeout(codeUpdateTimerRef.current);
       codeUpdateTimerRef.current = setTimeout(() => {
         socket.emit("codeChange", { roomId, code: newCode });
-      }, 300); 
+      }, 300);
 
       const now = Date.now();
       const TYPING_THROTTLE = 2000; // 2 seconds
