@@ -11,7 +11,7 @@ import { io } from "socket.io-client";
 // });
 
 
-const socket = io("http://localhost:5000/", {
+const socket = io("http://localhost:5000/" || "https://codecollab-x7b5.onrender.com/", {
   autoConnect: false,
 
   // ✅ polling first (mandatory for handshake), then websocket
