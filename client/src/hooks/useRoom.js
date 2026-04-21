@@ -316,12 +316,12 @@ export default function useRoom() {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
       const res = await axios.post(
-        "https://emkc.org/api/v2/piston/execute",
+        "http://localhost:5000/code/run",
         {
           language,
           version: "*",
-          files: [{ content: code }],
-          stdin: input, // 🟢 Send user input to Piston API
+          code,
+          stdin: input,
         },
         {
           signal: controller.signal,
@@ -332,7 +332,7 @@ export default function useRoom() {
       clearTimeout(timeoutId);
 
       const outputMsg =
-        res.data.run.output || res.data.run.stderr || "No output";
+        res.data.run?.output || res.data.run?.stderr || "No output";
       setOutput(outputMsg);
 
       // Broadcast output to all users
@@ -393,9 +393,9 @@ export default function useRoom() {
     typingUser,
     output,
     running,
-    input, // Export input
-    setInput, // Export input setter
-    cursors, // Export cursor positions
+    input,
+    setInput,
+    cursors,
 
     updateCode,
     updateLanguage,

@@ -1,9 +1,11 @@
+import { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import Toolbar from "../components/Toolbar";
 import Terminal from "../components/Terminal";
 import CodeEditor from "../editor/CodeEditor";
 import Navbar from "../components/Navbar";
 import { LoadingOverlay } from "../components/Loading";
+import AiPanel from "../components/AiPanel";
 import useRoom from "../hooks/useRoom";
 
 export default function Room() {
@@ -28,6 +30,8 @@ export default function Room() {
     leaveRoom,
   } = useRoom();
 
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+
   // Show loading while joining room
   if (!joined) {
     return <LoadingOverlay message="Joining room..." />;
@@ -39,16 +43,17 @@ export default function Room() {
 
       <Sidebar roomId={roomId} users={users} onLeave={leaveRoom} />
 
-      <div className="flex-1 flex flex-col">
-        {/* RUN BUTTON LIVES HERE */}
+      <div className="flex-1 flex flex-col min-w-0">
         <Toolbar
           language={language}
           onLanguageChange={updateLanguage}
           onRun={runCode}
           running={running}
+          onAiToggle={() => setAiPanelOpen((o) => !o)}
+          aiOpen={aiPanelOpen}
         />
 
-        <div className="flex-1">
+        <div className="flex-1 min-h-0">
           <CodeEditor
             code={code}
             language={language}
@@ -61,6 +66,14 @@ export default function Room() {
 
         <Terminal output={output} input={input} setInput={setInput} />
       </div>
+
+      <AiPanel
+        isOpen={aiPanelOpen}
+        onClose={() => setAiPanelOpen(false)}
+        code={code}
+        language={language}
+      />
     </div>
   );
 }
+

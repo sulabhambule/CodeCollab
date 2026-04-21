@@ -3,6 +3,8 @@ export default function Toolbar({
   onLanguageChange,
   onRun,
   running,
+  onAiToggle,
+  aiOpen,
 }) {
   return (
     <div
@@ -29,6 +31,18 @@ export default function Toolbar({
           transition-colors"
       >
         {running ? "⏳ Running…" : "▶ Run Code"}
+      </button>
+
+      {/* Spacer pushes AI button to the right */}
+      <div className="flex-1" />
+
+      <button
+        onClick={onAiToggle}
+        className={`ai-toolbar-btn ${aiOpen ? "ai-toolbar-btn--active" : ""}`}
+        title="Toggle AI Assistant"
+      >
+        <span className="ai-toolbar-btn__icon">🤖</span>
+        <span className="ai-toolbar-btn__label">AI Assistant</span>
       </button>
     </div>
   );

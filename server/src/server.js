@@ -8,6 +8,7 @@ import connectDB from "./db/connectDB.js";
 import setupSocket from "./socket/socketHandler.js";
 
 import aiRoutes from "./routes/aiRoutes.js";
+import codeRoutes from "./routes/codeRoutes.js";
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 app.use("/api", aiRoutes);
+app.use("/code", codeRoutes);
 
 /* Socket.IO*/
 const io = new Server(server, {
