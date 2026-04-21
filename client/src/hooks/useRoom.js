@@ -45,7 +45,7 @@ export default function useRoom() {
 
       if (pendingUpdates.current.length > 0) {
         console.log(
-          `🔄 Resending ${pendingUpdates.current.length} pending updates`,
+          `Resending ${pendingUpdates.current.length} pending updates`,
         );
         pendingUpdates.current.forEach((update) => {
           socket.emit(update.event, update.data);

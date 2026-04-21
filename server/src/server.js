@@ -7,6 +7,8 @@ import dotenv from "dotenv";
 import connectDB from "./db/connectDB.js";
 import setupSocket from "./socket/socketHandler.js";
 
+import aiRoutes from "./routes/aiRoutes.js";
+
 dotenv.config();
 
 const app = express();
@@ -27,6 +29,8 @@ const corsOptions = {
 // Apply to Express
 app.use(cors(corsOptions));
 app.use(express.json());
+
+app.use("/api", aiRoutes);
 
 /* Socket.IO*/
 const io = new Server(server, {
