@@ -8,11 +8,13 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@socket.io/redis-adapter": "^8.3.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "mongoose": "^9.1.5",
     "nanoid": "^5.1.6",
+    "redis": "^5.12.1",
     "socket.io": "^4.8.3",
     "y-websocket": "^3.0.0"
   },
