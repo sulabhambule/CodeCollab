@@ -64,7 +64,7 @@ app.use("/code", codeRoutes);
 // ==========================================
 const io = new Server(server, {
   cors: corsOptions, // Reuse the same options
-  transports: ["websocket"],
+  transports: ["websocket", "polling"],
 });
 
 // Socket Rate Limiting

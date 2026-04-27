@@ -36,28 +36,16 @@ export default function useRoom() {
   const lastCursorEmitRef = useRef(0);
 
   useEffect(() => {
-    if (!socket.connected) socket.connect();
+    socket.connect();
 
     const onConnect = () => {
-      console.log(" Socket connected");
+      console.log("Socket connected");
       setConnected(true);
-      reconnectAttempts.current = 0;
-
-      if (pendingUpdates.current.length > 0) {
-        console.log(
-          `Resending ${pendingUpdates.current.length} pending updates`,
-        );
-        pendingUpdates.current.forEach((update) => {
-          socket.emit(update.event, update.data);
-        });
-        pendingUpdates.current = [];
-      }
     };
 
     const onDisconnect = (reason) => {
       console.log("Socket disconnected:", reason);
       setConnected(false);
-      joinedRef.current = false;
     };
 
     const onConnectError = (error) => {
@@ -72,9 +60,6 @@ export default function useRoom() {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("connect_error", onConnectError);
-
-      socket.removeAllListeners();
-      socket.close(); // 🔥 IMPORTANT: stop retries
     };
   }, []);
 
