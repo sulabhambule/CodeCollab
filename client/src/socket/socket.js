@@ -1,6 +1,8 @@
 import { io } from "socket.io-client";
 
-const socket = io("https://codecollab-x7b5.onrender.com/", {
+//  https://codecollab-x7b5.onrender.com/
+
+const socket = io("http://34.207.131.98:8080", {
   autoConnect: false,
 
   // ✅ polling first (mandatory for handshake), then websocket

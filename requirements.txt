@@ -1,0 +1,62 @@
+# CodeCollab Project Requirements
+
+Since this is a Node.js project (MERN stack + WebSockets), the actual dependencies are managed by the `package.json` files in the `client` and `server` directories. You do not need to run `pip install -r requirements.txt`. Instead, you will use `npm install` in both directories. 
+
+Below is an overview of the system and package requirements for the project.
+
+## 1. System Requirements
+- Node.js (v18.x or higher recommended)
+- npm (Node Package Manager) or yarn
+- MongoDB (Local instance or MongoDB Atlas cluster for the database)
+- Redis (For scaling WebSockets across multiple server instances)
+- Git (for version control)
+
+## 2. Server (Backend) Dependencies
+Found in `server/package.json`.
+Install with: `cd server && npm install`
+
+**Core:**
+- express: Web framework for Node.js
+- dotenv: Loads environment variables from a .env file
+- cors: Enables Cross-Origin Resource Sharing
+
+**Database & Cache:**
+- mongoose: MongoDB object modeling tool
+- redis: Redis client for Node.js
+- @socket.io/redis-adapter: Scales Socket.io across multiple Node.js instances
+
+**Real-time Communication:**
+- socket.io: Real-time bidirectional event-based communication
+- y-websocket: WebSockets provider for Yjs (CRDT synchronization)
+
+**AI & Utils:**
+- @google/generative-ai: Gemini API for the AI assistant feature
+- express-rate-limit: Basic rate-limiting middleware
+- nanoid: Unique string ID generator
+- nodemon (Dev): Auto-restarts the server during development
+
+## 3. Client (Frontend) Dependencies
+Found in `client/package.json`.
+Install with: `cd client && npm install`
+
+**Core UI & State:**
+- react: Frontend UI library
+- react-dom: React entry point for the DOM
+- react-router-dom: Routing for React applications
+- tailwindcss & @tailwindcss/vite: Utility-first CSS framework
+
+**Code Editor & Collaboration:**
+- @monaco-editor/react: React wrapper for the Monaco Editor (VS Code's editor)
+- yjs: CRDT framework for shared editing
+- y-monaco: Yjs binding for the Monaco Editor
+- y-websocket: Connects Yjs to the WebSocket server
+
+**Network & Real-time:**
+- axios: Promise-based HTTP client
+- socket.io-client: Client for Socket.io
+
+**Utils & DevTools:**
+- uuid: Generates unique IDs
+- react-icons: Icons library for React
+- vite: Fast frontend build tool
+- eslint: Linting utility

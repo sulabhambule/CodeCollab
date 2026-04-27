@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./server
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_URI=${REDIS_URI}
+      - MONGO_URI=${MONGO_URI}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+  frontend:
+    build: ./client
+    ports:
+      - "5173:5173"
