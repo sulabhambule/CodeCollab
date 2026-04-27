@@ -57,23 +57,7 @@ export default function useRoom() {
     const onDisconnect = (reason) => {
       console.log("Socket disconnected:", reason);
       setConnected(false);
-      joinedRef.current = false; // Reset join state on disconnect
-
-      // Auto-reconnect with exponential backoff (max 3 attempts)
-      if (reason === "io server disconnect") {
-        // Server disconnected us, reconnect manually
-        if (reconnectAttempts.current < 3) {
-          const delay = Math.min(
-            1000 * Math.pow(2, reconnectAttempts.current),
-            5000,
-          );
-          console.log(`🔄 Reconnecting in ${delay}ms...`);
-          setTimeout(() => {
-            reconnectAttempts.current++;
-            socket.connect();
-          }, delay);
-        }
-      }
+      joinedRef.current = false;
     };
 
     const onConnectError = (error) => {
@@ -88,6 +72,9 @@ export default function useRoom() {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("connect_error", onConnectError);
+
+      socket.removeAllListeners();
+      socket.close(); // 🔥 IMPORTANT: stop retries
     };
   }, []);
 
@@ -181,17 +168,17 @@ export default function useRoom() {
       });
     };
 
-    socket.off("roomJoined");
-    socket.off("codeUpdate");
-    socket.off("languageUpdate");
-    socket.off("usersUpdate");
-    socket.off("user-joined");
-    socket.off("user-left");
-    socket.off("user-typing");
-    socket.off("user-stopped-typing");
-    socket.off("outputUpdate");
-    socket.off("cursorUpdate");
-    socket.off("cursorRemove");
+    // socket.off("roomJoined");
+    // socket.off("codeUpdate");
+    // socket.off("languageUpdate");
+    // socket.off("usersUpdate");
+    // socket.off("user-joined");
+    // socket.off("user-left");
+    // socket.off("user-typing");
+    // socket.off("user-stopped-typing");
+    // socket.off("outputUpdate");
+    // socket.off("cursorUpdate");
+    // socket.off("cursorRemove");
 
     socket.on("roomJoined", handleRoomJoined);
     socket.on("codeUpdate", handleCodeUpdate);
@@ -274,6 +261,8 @@ export default function useRoom() {
     }
 
     socket.emit("leaveRoom");
+    socket.removeAllListeners();
+    socket.close();
     joinedRef.current = false;
     setJoined(false);
     clearSession();
