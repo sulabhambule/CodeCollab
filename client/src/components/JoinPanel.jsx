@@ -25,9 +25,15 @@ export default function JoinPanel() {
     }
 
     setIsJoining(true);
-    saveSession({ roomId, userName, language });
 
-    // Small delay for smooth transition
+    let userId = localStorage.getItem("userId");
+    if (!userId) {
+      userId = crypto.randomUUID();
+      localStorage.setItem("userId", userId);
+    }
+
+    saveSession({ roomId, userName, language, userId });
+
     setTimeout(() => {
       navigate(`/room/${roomId}`);
     }, 300);

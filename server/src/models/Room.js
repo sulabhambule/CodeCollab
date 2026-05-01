@@ -10,16 +10,19 @@ const roomSchema = new mongoose.Schema(
     },
     code: {
       type: String,
-      default: "// Start coding...",
+      default: "",
     },
     language: {
       type: String,
       enum: ["javascript", "python", "java", "cpp"],
       default: "java",
     },
-
     users: [
       {
+        userId: {
+          type: String,
+          required: true
+        }, // this we are changing the schema so we need to change in the frontend and backend logic accordingly.
         socketId: {
           type: String,
           required: true,
@@ -33,7 +36,7 @@ const roomSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    versionKey: false, // 🔒 VERY IMPORTANT
+    versionKey: false,
   },
 );
 

@@ -5,48 +5,51 @@ const typingUsers = new Map();
 
 export default function setupSocket(io) {
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
-    // JOIN ROOM - "Safe" Version
-    socket.on("join", async ({ roomId, userName }) => {
-      try {
-        console.log(
-          `User ${userName} (${socket.id}) attempting to join room ${roomId}`,
-        );
 
-        const pendingDisconnect = disconnectTimeouts.get(userName);
+
+    // JOIN
+    socket.on("join", async (
+      { roomId, userName, userId }
+    ) => {
+      try {
+        //  Cancel pending disconnect 
+        const pendingDisconnect = disconnectTimeouts.get(userId);
         if (pendingDisconnect) {
           clearTimeout(pendingDisconnect.timeoutId);
-          disconnectTimeouts.delete(userName);
+          disconnectTimeouts.delete(userId);
         }
 
         socket.join(roomId);
-        // 2. Initialize Room (if it doesn't exist)
+
+        // 2) Initialize Room (if it doesn't exist)
         let room = await Room.findOne({ roomId });
 
         if (!room) {
-          console.log(`Creating new room: ${roomId}`);
           room = await Room.create({
             roomId,
-            code: "// Start coding...",
-            language: "javascript",
+            code: "",
+            language: "java",
             users: [],
           });
         }
 
         // 3. Check if user is already in the list
-        const userIndex = room.users.findIndex((u) => u.userName === userName);
+        const userIndex = room.users.findIndex((u) => u.userId === userId);
 
         if (userIndex !== -1) {
           // Update existing user's socket ID
           room.users[userIndex].socketId = socket.id;
-          console.log(`Updated socket ID for existing user: ${userName}`);
+          room.users[userIndex].userName = userName;
         } else {
           // Add new user
-          room.users.push({ socketId: socket.id, userName });
-          console.log(`Added new user: ${userName}`);
+          room.users.push({
+            userId,
+            socketId: socket.id,
+            userName
+          });
         }
+
         await room.save();
-        console.log(`Room ${roomId} now has ${room.users.length} users`);
 
         // 5. Send success to the user
         socket.emit("roomJoined", {
@@ -54,11 +57,17 @@ export default function setupSocket(io) {
           language: room.language,
           users: room.users,
         });
+
+        // 6) Broadcast new user to others in room
         const isTrulyNew = !pendingDisconnect && userIndex === -1;
         if (isTrulyNew) {
           socket
             .to(roomId)
-            .emit("user-joined", { socketId: socket.id, userName });
+            .emit("user-joined", {
+              userId,
+              userName,
+              socketId: socket.id,
+            });
         }
       } catch (err) {
         console.error("CRITICAL ERROR in Join Handler:", err);
@@ -71,7 +80,12 @@ export default function setupSocket(io) {
 
     // CODE CHANGE (REALTIME + DB)
     socket.on("codeChange", async ({ roomId, code }) => {
-      await Room.updateOne({ roomId }, { $set: { code } });
+      await Room.updateOne(
+        { roomId },
+        {
+          $set: { code }
+        }
+      );
       socket.to(roomId).emit("codeUpdate", code);
     });
 
@@ -81,7 +95,8 @@ export default function setupSocket(io) {
       io.to(roomId).emit("languageUpdate", language);
     });
 
-    socket.on("typing", ({ roomId, userName }) => {
+    // TYPING
+    socket.on("typing", ({ roomId, userId, userName }) => {
       if (!typingUsers.has(roomId)) {
         typingUsers.set(roomId, new Set());
       }
@@ -89,188 +104,161 @@ export default function setupSocket(io) {
       const roomTypingUsers = typingUsers.get(roomId);
 
       // Only broadcast if user is NOT already marked as typing
-      if (!roomTypingUsers.has(userName)) {
-        roomTypingUsers.add(userName);
-        socket.to(roomId).emit("user-typing", userName);
-        console.log(`${userName} started typing in ${roomId}`);
+      if (!roomTypingUsers.has(userId)) {
+        roomTypingUsers.add(userId);
+        socket.to(roomId).emit("user-typing", { userId, userName });
       }
     });
 
-    socket.on("stop-typing", ({ roomId, userName }) => {
+    socket.on("stop-typing", ({ roomId, userId, userName }) => {
       if (!typingUsers.has(roomId)) return;
 
       const roomTypingUsers = typingUsers.get(roomId);
 
       // Only broadcast if user was marked as typing
-      if (roomTypingUsers.has(userName)) {
-        roomTypingUsers.delete(userName);
-        socket.to(roomId).emit("user-stopped-typing", userName);
-        console.log(`${userName} stopped typing in ${roomId}`);
+      if (roomTypingUsers.has(userId)) {
+        roomTypingUsers.delete(userId);
+        socket.to(roomId).emit("user-stopped-typing", { userId, userName });
 
-        // Clean up empty Sets
         if (roomTypingUsers.size === 0) {
           typingUsers.delete(roomId);
         }
       }
     });
 
-    socket.on("codeExecution", ({ roomId, output, running, userName }) => {
-      console.log(`Code execution by ${userName} in room ${roomId}`);
-      io.to(roomId).emit("outputUpdate", { output, running, userName });
+    // EXECUTION
+    socket.on("codeExecution", ({ roomId, output, running, userId, userName }) => {
+      io.to(roomId).emit("outputUpdate", {
+        output,
+        running,
+        userId,
+        userName
+      });
     });
 
-    socket.on("cursorMove", ({ roomId, userName, position }) => {
-      socket.to(roomId).emit("cursorUpdate", { userName, position });
+    // CURSOR
+    socket.on("cursorMove", ({ roomId, userId, userName, position }) => {
+      socket.to(roomId).emit("cursorUpdate", {
+        userId,
+        userName,
+        position
+      });
     });
 
     // CLEANUP (DO NOT DELETE ROOM)
     const cleanup = async () => {
-      console.log(`Cleaning up socket ${socket.id}`);
 
-      // 1️⃣ Find the room where this socket exists
+      // Find the room where this socket exists
       const room = await Room.findOne({
         "users.socketId": socket.id,
       });
 
       if (!room) {
-        console.log(`No room found for socket ${socket.id}`);
+        // console.log(`No room found for socket ${socket.id}`);
         return;
       }
 
-      // 2️⃣ Find the userName for this socket (needed for timeout tracking)
+      // 2 Find the userName for this socket (needed for timeout tracking)
       const user = room.users.find((u) => u.socketId === socket.id);
       if (!user) {
-        console.log(`No user found for socket ${socket.id}`);
         return;
       }
 
-      const { userName } = user;
+      const { userId, userName } = user;
       const socketId = socket.id;
-      console.log(`User ${userName} disconnecting from room ${room.roomId}`);
 
       const DISCONNECT_DELAY = 30000;
       const disconnectRoomId = room.roomId;
 
       // Cancel any existing timeout for this user
-      if (disconnectTimeouts.has(userName)) {
-        const existing = disconnectTimeouts.get(userName);
+      if (disconnectTimeouts.has(userId)) {
+        const existing = disconnectTimeouts.get(userId);
         clearTimeout(existing.timeoutId);
-        console.log(`Cancelled previous timeout for ${userName}`);
       }
 
       const timeoutId = setTimeout(async () => {
-        const currentTimeout = disconnectTimeouts.get(userName);
+        const currentTimeout = disconnectTimeouts.get(userId);
         if (!currentTimeout || currentTimeout.timeoutId !== timeoutId) {
-          console.log(
-            `Timeout for ${userName} was cancelled, skipping removal`,
-          );
           return;
         }
 
         const checkRoom = await Room.findOne({ roomId: disconnectRoomId });
         const currentUser = checkRoom?.users?.find(
-          (u) => u.userName === userName,
+          (u) => u.userId === userId,
         );
 
         // If user exists but has a DIFFERENT socket ID, they reconnected! Abort.
         if (currentUser && currentUser.socketId !== socketId) {
-          console.log(
-            `User ${userName} reconnected (Socket mismatch), aborting removal.`,
-          );
-          disconnectTimeouts.delete(userName); // Cleanup
+          disconnectTimeouts.delete(userId); // Cleanup
           return;
         }
 
-        console.log(
-          `Disconnect timeout expired for ${userName}, removing from room`,
-        );
-
-        // 3️⃣ Remove the user
+        // 3 Remove the user
         await Room.updateOne(
           { roomId: disconnectRoomId },
-          { $pull: { users: { userName } } },
+          { $pull: { users: { userId } } },
         );
 
-        // 4️⃣ Fetch updated users list (for logging)
+        // 4️ Fetch updated users list (for logging)
         const updatedRoom = await Room.findOne({ roomId: disconnectRoomId });
-        if (updatedRoom) {
-          console.log(
-            `Room ${disconnectRoomId} now has ${updatedRoom.users.length} users after cleanup`,
-          );
-        }
 
-        // 5️⃣ OPTIMIZED: Send delta update (only removed user) to others
-        io.to(disconnectRoomId).emit("user-left", userName);
+        // Send delta update (only removed user) to others
+        io.to(disconnectRoomId).emit("user-left", userId);
 
-        // 🔹 Remove cursor for this user
-        io.to(disconnectRoomId).emit("cursorRemove", { userName });
+        io.to(disconnectRoomId).emit("cursorRemove", { userId });
 
-        // 6️⃣ Clean up typing status
+        // Clean up typing status
         if (typingUsers.has(disconnectRoomId)) {
-          typingUsers.get(disconnectRoomId).delete(userName);
+          typingUsers.get(disconnectRoomId).delete(userId);
         }
 
-        // 7️⃣ Clean up timeout tracker
-        disconnectTimeouts.delete(userName);
+        //  Clean up timeout tracker
+        disconnectTimeouts.delete(userId);
       }, DISCONNECT_DELAY);
 
       // Store the timeout with roomId
-      disconnectTimeouts.set(userName, { timeoutId, roomId: disconnectRoomId });
-      console.log(
-        `Disconnect timeout set for ${userName} in room ${disconnectRoomId} (${DISCONNECT_DELAY}ms)`,
-      );
+      disconnectTimeouts.set(userId, { timeoutId, roomId: disconnectRoomId });
 
-      // 8️⃣ Leave the socket room immediately
+      //  Leave the socket room immediately
       socket.leave(room.roomId);
     };
 
     const instantCleanup = async () => {
-      console.log(`User explicitly leaving (socket ${socket.id})`);
-
-      // 1️⃣ Find the room where this socket exist
+      // Find the room where this socket exist
       const room = await Room.findOne({
         "users.socketId": socket.id,
       });
 
       if (!room) {
-        console.log(`No room found for socket ${socket.id}`);
         return;
       }
 
-      // 2️⃣ Find the userName
+      // Find the userName
       const user = room.users.find((u) => u.socketId === socket.id);
       if (!user) {
-        console.log(`No user found for socket ${socket.id}`);
         return;
       }
 
-      const { userName } = user;
-      console.log(`User ${userName} explicitly leaving room ${room.roomId}`);
+      const { userId, userName } = user;
 
-      if (disconnectTimeouts.has(userName)) {
-        const existing = disconnectTimeouts.get(userName);
+      if (disconnectTimeouts.has(userId)) {
+        const existing = disconnectTimeouts.get(userId);
         clearTimeout(existing.timeoutId);
-        disconnectTimeouts.delete(userName);
-        console.log(`Cancelled pending timeout for ${userName}`);
+        disconnectTimeouts.delete(userId);
       }
 
       await Room.updateOne(
         { roomId: room.roomId },
-        { $pull: { users: { userName } } },
+        { $pull: { users: { userId } } },
       );
 
-      const updatedRoom = await Room.findOne({ roomId: room.roomId });
-      console.log(
-        `Room ${room.roomId} now has ${updatedRoom.users.length} users after instant cleanup`,
-      );
+      io.to(room.roomId).emit("user-left", userId);
 
-      io.to(room.roomId).emit("user-left", userName);
-
-      // 🔹 Remove cursor for this user
-      io.to(room.roomId).emit("cursorRemove", { userName });
+      // Remove cursor for this user
+      io.to(room.roomId).emit("cursorRemove", { userId });
 
       if (typingUsers.has(room.roomId)) {
-        typingUsers.get(room.roomId).delete(userName);
+        typingUsers.get(room.roomId).delete(userId);
       }
 
       // Leave the socket room

@@ -1,8 +1,16 @@
-import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef
+} from "react";
+import {
+  useParams,
+  useNavigate
+} from "react-router-dom";
 import socket from "../socket/socket";
 import { getSession, clearSession } from "../storage/session";
-import axios from "axios";
 
 export default function useRoom() {
   const { roomId } = useParams();
@@ -12,8 +20,9 @@ export default function useRoom() {
   const [joined, setJoined] = useState(false);
 
   const [userName, setUserName] = useState("");
+  const [userId, setUserId] = useState("");
   const [language, setLanguage] = useState("java");
-  const [code, setCode] = useState("// Start coding...");
+  const [code, setCode] = useState("");
   const [users, setUsers] = useState([]);
 
   const [typingUser, setTypingUser] = useState("");
@@ -35,56 +44,52 @@ export default function useRoom() {
   const lastCodeRef = useRef("");
   const lastCursorEmitRef = useRef(0);
 
+
+  // socket connection.
   useEffect(() => {
     socket.connect();
 
     const onConnect = () => {
-      console.log("Socket connected");
       setConnected(true);
     };
 
     const onDisconnect = (reason) => {
-      console.log("Socket disconnected:", reason);
       setConnected(false);
-    };
-
-    const onConnectError = (error) => {
-      console.error("Connection error:", error.message);
     };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
-    socket.on("connect_error", onConnectError);
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
-      socket.off("connect_error", onConnectError);
     };
   }, []);
 
+
+  // JOIN ROOM
   useEffect(() => {
     const session = getSession();
-    if (!session?.userName) return;
+    if (!session?.userName || !session?.userId) return;
     if (!socket.connected) return;
     if (joinedRef.current) return;
 
     setUserName(session.userName);
+    setUserId(session.userId);
     setLanguage(session.language || "java");
 
-    console.log("Joining room:", roomId, "as", session.userName);
     socket.emit("join", {
       roomId,
       userName: session.userName,
+      userId: session.userId
     });
 
     joinedRef.current = true;
   }, [roomId, connected]);
 
-  // ---- SOCKET LISTENERS ----
+  // SOCKET LISTENERS 
   useEffect(() => {
     const handleRoomJoined = ({ code, language, users }) => {
-      console.log("Room joined successfully. Users:", users);
       setCode(code);
       setLanguage(language);
       setUsers(users);
@@ -100,22 +105,27 @@ export default function useRoom() {
     };
 
     const handleUsersUpdate = (updatedUsers) => {
-      console.log("Users updated:", updatedUsers);
       setUsers(updatedUsers);
-    };
+    }; // this need to be removed see if usecase is there or not.
 
     const handleUserJoined = (newUser) => {
-      console.log("User joined:", newUser.userName);
-      setUsers((prev) => [...prev, newUser]);
+      setUsers((prev) => {
+        const exits = prev.find((u) => u.userId === newUser.userId);
+        if (exits) {
+          return prev.map((user) =>
+            user.userId === newUser.userId ? newUser : user
+          );
+        }
+        return [...prev, newUser];
+      })
     };
 
-    const handleUserLeft = (userName) => {
-      console.log("User left:", userName);
-      setUsers((prev) => prev.filter((u) => u.userName !== userName));
+    const handleUserLeft = ({ userId }) => {
+      setUsers((prev) => prev.filter((u) => u.userId !== userId));
     };
 
-    const handleUserTyping = (name) => {
-      setTypingUser(name);
+    const handleUserTyping = ({ userId, userName }) => {
+      setTypingUser(userName);
       clearTimeout(typingTimerRef.current);
       typingTimerRef.current = setTimeout(() => {
         setTypingUser("");
@@ -130,45 +140,30 @@ export default function useRoom() {
 
     const handleOutputUpdate = ({
       output,
-      running,
-      userName: executingUser,
+      running
     }) => {
-      console.log(`Code output from ${executingUser}:`, output);
       setOutput(output);
       setRunning(running);
     };
 
-    const handleCursorUpdate = ({ userName: cursorUserName, position }) => {
+    const handleCursorUpdate = ({ userId, position }) => {
       setCursors((prev) => ({
         ...prev,
-        [cursorUserName]: position,
+        [userId]: position,
       }));
     };
 
-    const handleCursorRemove = ({ userName: cursorUserName }) => {
+    const handleCursorRemove = ({ userId }) => {
       setCursors((prev) => {
         const updated = { ...prev };
-        delete updated[cursorUserName];
+        delete updated[userId];
         return updated;
       });
     };
 
-    // socket.off("roomJoined");
-    // socket.off("codeUpdate");
-    // socket.off("languageUpdate");
-    // socket.off("usersUpdate");
-    // socket.off("user-joined");
-    // socket.off("user-left");
-    // socket.off("user-typing");
-    // socket.off("user-stopped-typing");
-    // socket.off("outputUpdate");
-    // socket.off("cursorUpdate");
-    // socket.off("cursorRemove");
-
     socket.on("roomJoined", handleRoomJoined);
     socket.on("codeUpdate", handleCodeUpdate);
     socket.on("languageUpdate", handleLanguageUpdate);
-    socket.on("usersUpdate", handleUsersUpdate);
     socket.on("user-joined", handleUserJoined);
     socket.on("user-left", handleUserLeft);
     socket.on("user-typing", handleUserTyping);
@@ -181,7 +176,6 @@ export default function useRoom() {
       socket.off("roomJoined", handleRoomJoined);
       socket.off("codeUpdate", handleCodeUpdate);
       socket.off("languageUpdate", handleLanguageUpdate);
-      socket.off("usersUpdate", handleUsersUpdate);
       socket.off("user-joined", handleUserJoined);
       socket.off("user-left", handleUserLeft);
       socket.off("user-typing", handleUserTyping);
@@ -192,9 +186,11 @@ export default function useRoom() {
     };
   }, []);
 
+  // CODE UPDATE
   const updateCode = useCallback(
     (newCode) => {
       setCode(newCode);
+      // offline handling
       if (!socket.connected) {
         pendingUpdates.current.push({
           event: "codeChange",
@@ -203,34 +199,47 @@ export default function useRoom() {
         return;
       }
 
+      // prevent duplicate emits. (avoid unecessary network call)
       if (newCode === lastCodeRef.current) return;
       lastCodeRef.current = newCode;
 
+      // Debounced code sync
       clearTimeout(codeUpdateTimerRef.current);
       codeUpdateTimerRef.current = setTimeout(() => {
         socket.emit("codeChange", { roomId, code: newCode });
       }, 300);
 
+      // typing indicator logic
       const now = Date.now();
       const TYPING_THROTTLE = 2000; // 2 seconds
       const STOP_TYPING_DELAY = 1500; // 1.5 seconds
 
       if (now - lastTypingEmitRef.current >= TYPING_THROTTLE) {
-        socket.emit("typing", { roomId, userName });
+        socket.emit("typing", {
+          roomId,
+          userId,
+          userName
+        });
+
         lastTypingEmitRef.current = now;
         isTypingRef.current = true;
       }
 
-      // ✅ OPTIMIZED: Emit "stop-typing" after 1.5s of inactivity
+      // Emit "stop-typing" after 1.5s of inactivity
       clearTimeout(stopTypingTimerRef.current);
       stopTypingTimerRef.current = setTimeout(() => {
         if (isTypingRef.current) {
-          socket.emit("stop-typing", { roomId, userName });
+          socket.emit("stop-typing", {
+            roomId,
+            userId,
+            userName
+          });
+
           isTypingRef.current = false;
         }
       }, STOP_TYPING_DELAY);
     },
-    [roomId, userName],
+    [roomId, userId, userName],
   );
 
   const updateLanguage = (lang) => {
@@ -239,20 +248,23 @@ export default function useRoom() {
   };
 
   const leaveRoom = () => {
-    console.log("Leaving room");
     if (isTypingRef.current) {
-      socket.emit("stop-typing", { roomId, userName });
+      socket.emit("stop-typing", {
+        roomId,
+        userId,
+        userName
+      });
       isTypingRef.current = false;
     }
 
     socket.emit("leaveRoom");
     socket.removeAllListeners();
     socket.close();
+
     joinedRef.current = false;
     setJoined(false);
-    clearSession();
 
-    // Clean up timers
+    clearSession();
     clearTimeout(typingTimerRef.current);
     clearTimeout(codeUpdateTimerRef.current);
     clearTimeout(stopTypingTimerRef.current);
@@ -264,12 +276,14 @@ export default function useRoom() {
     if (!code.trim()) {
       const outputMsg = "⚠️ No code to run";
       setOutput(outputMsg);
+
       // Broadcast to all users
       socket.emit("codeExecution", {
         roomId,
         output: outputMsg,
         running: false,
         userName,
+        userId
       });
       return;
     }
@@ -283,6 +297,7 @@ export default function useRoom() {
       output: "Running…",
       running: true,
       userName,
+      userId,
     });
 
     try {
@@ -309,7 +324,6 @@ export default function useRoom() {
 
       const outputMsg =
         res.data.run?.output || res.data.run?.stderr || "No output";
-      setOutput(outputMsg);
 
       // Broadcast output to all users
       socket.emit("codeExecution", {
@@ -317,7 +331,9 @@ export default function useRoom() {
         output: outputMsg,
         running: false,
         userName,
+        userId
       });
+      setOutput(outputMsg);
     } catch (error) {
       let errorMsg = "Execution error";
 
@@ -328,16 +344,15 @@ export default function useRoom() {
       } else if (error.request) {
         errorMsg = " Network error - check your connection";
       }
-
-      console.error("Code execution error:", error);
-      setOutput(errorMsg);
-
       socket.emit("codeExecution", {
         roomId,
         output: errorMsg,
         running: false,
         userName,
+        userId
       });
+
+      setOutput(errorMsg);
     } finally {
       setRunning(false);
     }
@@ -351,11 +366,17 @@ export default function useRoom() {
       const CURSOR_THROTTLE = 100; // 100ms = 10 updates/sec
 
       if (now - lastCursorEmitRef.current >= CURSOR_THROTTLE) {
-        socket.emit("cursorMove", { roomId, userName, position });
+        socket.emit("cursorMove", {
+          roomId,
+          userId,
+          userName,
+          position
+        });
+
         lastCursorEmitRef.current = now;
       }
     },
-    [roomId, userName, joined],
+    [roomId, userId, userName, joined],
   );
 
   return {
@@ -363,6 +384,7 @@ export default function useRoom() {
     joined,
     roomId,
     userName,
+    userId,
     language,
     code,
     users,
@@ -377,6 +399,6 @@ export default function useRoom() {
     updateLanguage,
     runCode,
     leaveRoom,
-    updateCursor, // Export cursor update function
+    updateCursor,
   };
 }

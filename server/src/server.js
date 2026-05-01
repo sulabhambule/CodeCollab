@@ -152,18 +152,22 @@ startServer();
 // Step 5: Server 2 receives event
 // Step 6: Server 2 emits to its users
 // client1 → Server-A → Redis → Server-B → client2
-//
+
+
 // How Redis makes this work:
 // 1. Redis is the "middleman"
 // 2. When one server needs to talk to other servers, it tells Redis
 // 3. Redis forwards the message to ALL servers
 // 4. Each server then tells its own connected users
-//
+
+
 // Without Redis (single server):
 // - Easy, no extra setup needed
 // - Users only see other users on same server
 // - No cross-server communication
-//
+
+
+
 // Built a horizontally scalable real-time code collaboration platform using Socket.IO
 // and Redis Pub/Sub, supporting 1000+ concurrent WebSocket connections with
 // <100ms synchronization latency across distributed backend instances.
@@ -182,3 +186,11 @@ startServer();
 // - SET/GET: Store temporary data
 // - ROOM: Manage room membership
 
+
+
+
+// ssh -i codecollab-key.pem ubuntu@34.207.131.98
+
+// if permission is not given by PC then simply run this commands.
+// icacls codecollab-key.pem /inheritance:r
+// icacls codecollab-key.pem /grant:r %USERNAME%:R

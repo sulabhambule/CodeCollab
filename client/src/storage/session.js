@@ -10,10 +10,10 @@ const SESSION_KEY = "codecollab-session";
  * @param {string} [session.language]
  */
 
-export function saveSession({ roomId, userName, language }) {
+export function saveSession({ roomId, userName, language, userId }) {
   if (!roomId || !userName) return;
 
-  const data = { roomId, userName };
+  const data = { roomId, userName, userId };
 
   if (language) {
     data.language = language;
@@ -21,6 +21,19 @@ export function saveSession({ roomId, userName, language }) {
 
   localStorage.setItem(SESSION_KEY, JSON.stringify(data));
 }
+
+
+function getOrCreateUserId() {
+  let userId = localStorage.getItem("userId");
+
+  if (!userId) {
+    // we need to create the new userId
+    userId = crypto.randomUUID();
+    localStorage.setItem("userId", userId);
+  }
+  return userId;
+}
+
 
 /**
  * Get saved session from localStorage
@@ -33,8 +46,16 @@ export function getSession() {
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw);
-  } catch {
+    const session = JSON.parse(raw);
+
+    // Ensure userId always exists
+    if (!session.userId) {
+      session.userId = getOrCreateUserId();
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    }
+
+    return session;
+  } catch (err) {
     console.error("Invalid session data", err);
     return null;
   }
