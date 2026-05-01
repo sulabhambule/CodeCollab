@@ -194,3 +194,9 @@ startServer();
 // if permission is not given by PC then simply run this commands.
 // icacls codecollab-key.pem /inheritance:r
 // icacls codecollab-key.pem /grant:r %USERNAME%:R
+
+// To rebundle the docker on the EC2 instance
+// after pulling from the repo simplly run below  2 commands
+
+// sudo docker-compose down
+// sudo docker - compose up--build - d

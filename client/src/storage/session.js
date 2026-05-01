@@ -1,15 +1,10 @@
-// “After refresh, how do I know who the user is and which room they belong to?”
+import { v4 as uuid } from "uuid";
 
 const SESSION_KEY = "codecollab-session";
 
 /**
  * Save user session in localStorage
- * @param {Object} session
- * @param {string} session.roomId
- * @param {string} session.userName
- * @param {string} [session.language]
  */
-
 export function saveSession({ roomId, userName, language, userId }) {
   if (!roomId || !userName) return;
 
@@ -22,24 +17,23 @@ export function saveSession({ roomId, userName, language, userId }) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(data));
 }
 
-
+/**
+ * Generate or get userId
+ */
 function getOrCreateUserId() {
   let userId = localStorage.getItem("userId");
 
   if (!userId) {
-    // we need to create the new userId
-    userId = crypto.randomUUID();
+    userId = uuid(); // ✅ FIXED
     localStorage.setItem("userId", userId);
   }
+
   return userId;
 }
 
-
 /**
- * Get saved session from localStorage
- * @returns {Object|null}
+ * Get saved session
  */
-
 export function getSession() {
   const raw = localStorage.getItem(SESSION_KEY);
 
@@ -61,10 +55,9 @@ export function getSession() {
   }
 }
 
-/*
-clear session
-*/
-
+/**
+ * Clear session
+ */
 export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }

@@ -27,8 +27,9 @@ export default function JoinPanel() {
     setIsJoining(true);
 
     let userId = localStorage.getItem("userId");
+
     if (!userId) {
-      userId = crypto.randomUUID();
+      userId = uuid();
       localStorage.setItem("userId", userId);
     }
 
