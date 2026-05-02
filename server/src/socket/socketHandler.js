@@ -270,7 +270,7 @@ export default function setupSocket(io) {
         codeCache.delete(room.roomId);
         lastSavedCode.delete(room.roomId);
         typingUsers.delete(room.roomId);
-      }
+      } 
 
       // Leave the socket room
       socket.leave(room.roomId);
