@@ -200,3 +200,21 @@ startServer();
 
 // sudo docker-compose down
 // sudo docker - compose up--build - d
+
+
+
+
+
+// Built a real-time collaborative code editor using Socket.IO, supporting multi-user editing with low-latency synchronization.
+
+// Designed a scalable WebSocket architecture using Redis Pub/Sub, enabling cross-instance communication.
+
+// Implemented stable user identity using UUIDs to handle reconnections and prevent duplicate sessions.
+
+// Optimized backend performance by caching real-time updates in memory and batching database writes, reducing write load by >90%.
+
+// Deployed application on AWS EC2 using Docker and Docker Compose for scalable and consistent environments.
+
+// Designed CI/CD pipeline using GitHub Actions to automate build and deployment workflows.
+
+// Implemented IP-based rate limiting and request throttling to enhance backend security and prevent abuse.

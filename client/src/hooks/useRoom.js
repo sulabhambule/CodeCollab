@@ -1,4 +1,3 @@
-import axios from "axios";
 import {
   useEffect,
   useState,
@@ -9,8 +8,13 @@ import {
   useParams,
   useNavigate
 } from "react-router-dom";
+import axios from "axios";
 import socket from "../socket/socket";
-import { getSession, clearSession } from "../storage/session";
+
+import {
+  getSession,
+  clearSession
+} from "../storage/session";
 
 export default function useRoom() {
   const { roomId } = useParams();
@@ -274,7 +278,7 @@ export default function useRoom() {
 
   const runCode = async () => {
     if (!code.trim()) {
-      const outputMsg = "⚠️ No code to run";
+      const outputMsg = "No code to run";
       setOutput(outputMsg);
 
       // Broadcast to all users

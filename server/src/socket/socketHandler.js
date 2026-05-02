@@ -2,11 +2,11 @@ import Room from "../models/Room.js";
 
 const disconnectTimeouts = new Map();
 const typingUsers = new Map();
+const codeCache = new Map();
+const lastSavedCode = new Map();
 
 export default function setupSocket(io) {
   io.on("connection", (socket) => {
-
-
     // JOIN
     socket.on("join", async (
       { roomId, userName, userId }
@@ -25,6 +25,7 @@ export default function setupSocket(io) {
         let room = await Room.findOne({ roomId });
 
         if (!room) {
+          // if room not found create a new room.
           room = await Room.create({
             roomId,
             code: "",
@@ -51,14 +52,15 @@ export default function setupSocket(io) {
 
         await room.save();
 
-        // 5. Send success to the user
+        const cachedCode = codeCache.get(roomId);
+        //  Send success to the user
         socket.emit("roomJoined", {
-          code: room.code,
+          code: cachedCode || room.code, // alwats latest
           language: room.language,
           users: room.users,
         });
 
-        // 6) Broadcast new user to others in room
+        //  Broadcast new user to others in room
         const isTrulyNew = !pendingDisconnect && userIndex === -1;
         if (isTrulyNew) {
           socket
@@ -70,7 +72,6 @@ export default function setupSocket(io) {
             });
         }
       } catch (err) {
-        console.error("CRITICAL ERROR in Join Handler:", err);
         socket.emit("roomJoined", {
           error: true,
           message: "Failed to join room. Please try again.",
@@ -78,14 +79,11 @@ export default function setupSocket(io) {
       }
     });
 
-    // CODE CHANGE (REALTIME + DB)
-    socket.on("codeChange", async ({ roomId, code }) => {
-      await Room.updateOne(
-        { roomId },
-        {
-          $set: { code }
-        }
-      );
+    // CODE CHANGE
+    socket.on("codeChange", ({ roomId, code }) => {
+      // store in memory
+      codeCache.set(roomId, code);
+      // broadcast to others.
       socket.to(roomId).emit("codeUpdate", code);
     });
 
@@ -153,22 +151,17 @@ export default function setupSocket(io) {
         "users.socketId": socket.id,
       });
 
-      if (!room) {
-        // console.log(`No room found for socket ${socket.id}`);
-        return;
-      }
+      if (!room) return;
 
-      // 2 Find the userName for this socket (needed for timeout tracking)
+      // Find the userName for this socket (needed for timeout tracking)
       const user = room.users.find((u) => u.socketId === socket.id);
-      if (!user) {
-        return;
-      }
+      if (!user) return;
 
-      const { userId, userName } = user;
+      const { userId } = user;
       const socketId = socket.id;
+      const roomId = room.roomId;
 
-      const DISCONNECT_DELAY = 30000;
-      const disconnectRoomId = room.roomId;
+      const DISCONNECT_DELAY = 20000;
 
       // Cancel any existing timeout for this user
       if (disconnectTimeouts.has(userId)) {
@@ -178,9 +171,8 @@ export default function setupSocket(io) {
 
       const timeoutId = setTimeout(async () => {
         const currentTimeout = disconnectTimeouts.get(userId);
-        if (!currentTimeout || currentTimeout.timeoutId !== timeoutId) {
+        if (!currentTimeout || currentTimeout.timeoutId !== timeoutId)
           return;
-        }
 
         const checkRoom = await Room.findOne({ roomId: disconnectRoomId });
         const currentUser = checkRoom?.users?.find(
@@ -193,14 +185,21 @@ export default function setupSocket(io) {
           return;
         }
 
-        // 3 Remove the user
+        const latestCode = codeCache.get(roomId);
+
+        if (latestCode) {
+          await Room.updateOne(
+            { roomId: roomId },
+            { $set: { code: latestCode } }
+          );
+        }
+
+        // Remove the user
         await Room.updateOne(
           { roomId: disconnectRoomId },
           { $pull: { users: { userId } } },
         );
 
-        // 4️ Fetch updated users list (for logging)
-        const updatedRoom = await Room.findOne({ roomId: disconnectRoomId });
 
         // Send delta update (only removed user) to others
         io.to(disconnectRoomId).emit("user-left", userId);
@@ -210,6 +209,15 @@ export default function setupSocket(io) {
         // Clean up typing status
         if (typingUsers.has(disconnectRoomId)) {
           typingUsers.get(disconnectRoomId).delete(userId);
+        }
+
+        // MEMORY CLEANUP
+        const updatedRoom = await Room.findOne({ roomId });
+
+        if (!updatedRoom || updatedRoom.users.length === 0) {
+          codeCache.delete(roomId);
+          lastSavedCode.delete(roomId);
+          typingUsers.delete(roomId);
         }
 
         //  Clean up timeout tracker
@@ -229,17 +237,13 @@ export default function setupSocket(io) {
         "users.socketId": socket.id,
       });
 
-      if (!room) {
-        return;
-      }
+      if (!room) return;
 
       // Find the userName
       const user = room.users.find((u) => u.socketId === socket.id);
-      if (!user) {
-        return;
-      }
+      if (!user) return;
 
-      const { userId, userName } = user;
+      const { userId } = user;
 
       if (disconnectTimeouts.has(userId)) {
         const existing = disconnectTimeouts.get(userId);
@@ -253,12 +257,19 @@ export default function setupSocket(io) {
       );
 
       io.to(room.roomId).emit("user-left", userId);
-
-      // Remove cursor for this user
       io.to(room.roomId).emit("cursorRemove", { userId });
 
+      // typing cleanup
       if (typingUsers.has(room.roomId)) {
         typingUsers.get(room.roomId).delete(userId);
+      }
+      // MEMORY CLEANUP 
+      const updatedRoom = await Room.findOne({ roomId: room.roomId });
+
+      if (!updatedRoom || updatedRoom.users.length === 0) {
+        codeCache.delete(room.roomId);
+        lastSavedCode.delete(room.roomId);
+        typingUsers.delete(room.roomId);
       }
 
       // Leave the socket room
@@ -269,3 +280,19 @@ export default function setupSocket(io) {
     socket.on("disconnect", cleanup); // Graceful timeout
   });
 }
+
+
+setInterval(async () => {
+  for (const [roomId, code] of codeCache.entries()) {
+    try {
+      if (lastSavedCode.get(roomId) === code) continue;
+      await Room.updateOne(
+        { roomId },
+        { $set: { code } }
+      );
+      lastSavedCode.set(roomId, code);
+    } catch (err) {
+      console.error("DB Save Error:", err);
+    }
+  }
+}, 5000); // every 5 sec.
