@@ -20,3 +20,6 @@ frontend/.vite
 Thumbs.db
 
 notes.txt
+requirement.txt
+redis_scaling_guide.md
+CodeCollab_Hightlights.md
