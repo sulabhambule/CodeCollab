@@ -9,6 +9,8 @@ services:
       - REDIS_URI=${REDIS_URI}
       - MONGO_URI=${MONGO_URI}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JDOODLE_CLIENT_ID=${JDOODLE_CLIENT_ID}
+      - JDOODLE_CLIENT_SECRET=${JDOODLE_CLIENT_SECRET}
   frontend:
     build: ./client
     ports:
