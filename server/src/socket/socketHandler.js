@@ -225,7 +225,7 @@ export default function setupSocket(io) {
       }, DISCONNECT_DELAY);
 
       // Store the timeout with roomId
-      disconnectTimeouts.set(userId, { timeoutId, roomId: disconnectRoomId });
+      disconnectTimeouts.set(userId, { timeoutId, roomId: roomId });
 
       //  Leave the socket room immediately
       socket.leave(room.roomId);
@@ -270,7 +270,7 @@ export default function setupSocket(io) {
         codeCache.delete(room.roomId);
         lastSavedCode.delete(room.roomId);
         typingUsers.delete(room.roomId);
-      } 
+      }
 
       // Leave the socket room
       socket.leave(room.roomId);

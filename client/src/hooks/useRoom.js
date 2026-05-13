@@ -51,7 +51,7 @@ export default function useRoom() {
 
   // socket connection.
   useEffect(() => {
-    socket.connect();
+    if (!socket.connected) socket.connect();
 
     const onConnect = () => {
       setConnected(true);

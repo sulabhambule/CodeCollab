@@ -15,15 +15,11 @@ import setupSocket from "./socket/socketHandler.js";
 
 dotenv.config();
 
-// ==========================================
 // 1. Initialize App & Server 
-// ==========================================
 const app = express();
 const server = http.createServer(app);
 
-// ==========================================
 // 2. Middleware Configuration
-// ==========================================
 const allowedOrigins = [
   "http://34.207.131.98:5173",
   "https://code-collab-one-bay.vercel.app", // Production
@@ -50,18 +46,15 @@ const apiLimiter = rateLimit({
 
 app.use(apiLimiter);
 
-// ==========================================
 // 3. Routes
-// ==========================================
 app.get("/", (req, res) => {
   res.send("Backend running 🚀");
 });
+
 app.use("/api", aiRoutes);
 app.use("/code", codeRoutes);
 
-// ==========================================
 // 4. Socket.IO Setup & Rate Limiting
-// ==========================================
 const io = new Server(server, {
   cors: corsOptions, // Reuse the same options
   transports: ["websocket", "polling"],
@@ -103,9 +96,7 @@ setInterval(() => {
 
 setupSocket(io);
 
-// ==========================================
 // 5. Redis Adapter & Server Initialization
-// ==========================================
 const redisUri = process.env.REDIS_URI;
 const pubClient = createClient({ url: redisUri });
 const subClient = pubClient.duplicate();
@@ -114,9 +105,9 @@ async function startServer() {
   // Connect DB
   try {
     await connectDB();
-    console.log("✅ MongoDB connected");
+    console.log("MongoDB connected");
   } catch (err) {
-    console.error("❌ MongoDB connection failed:", err.message);
+    console.error("MongoDB connection failed:", err.message);
   }
 
   // Connect Redis and setup Adapter
@@ -124,10 +115,10 @@ async function startServer() {
     await pubClient.connect();
     await subClient.connect();
     io.adapter(createAdapter(pubClient, subClient));
-    console.log("🚀 Redis adapter attached to Socket.IO");
+    console.log("Redis adapter attached to Socket.IO");
   } catch (err) {
-    console.error("❌ Redis connection failed:", err.message);
-    console.log("⚠️ Running in single-server mode (no scaling)");
+    console.error("Redis connection failed:", err.message);
+    console.log("Running in single-server mode (no scaling)");
   }
 
   // Start HTTP Server
@@ -139,82 +130,4 @@ async function startServer() {
 
 startServer();
 
-// ==========================================
-// Notes & Documentation
-// ==========================================
-// Client → Any Server → Socket.IO → Redis → All Servers Sync → All Clients Receive
-//
-// HORIZONTAL SCALING
-// Step 1: Client A → Server 1
-// Step 2: Server 1 emits event
-// Step 3: Event is published to Redis
-// Step 4: Redis broadcasts to ALL servers
-// Step 5: Server 2 receives event
-// Step 6: Server 2 emits to its users
-// client1 → Server-A → Redis → Server-B → client2
 
-
-// How Redis makes this work:
-// 1. Redis is the "middleman"
-// 2. When one server needs to talk to other servers, it tells Redis
-// 3. Redis forwards the message to ALL servers
-// 4. Each server then tells its own connected users
-
-
-// Without Redis (single server):
-// - Easy, no extra setup needed
-// - Users only see other users on same server
-// - No cross-server communication
-
-
-
-// Built a horizontally scalable real-time code collaboration platform using Socket.IO
-// and Redis Pub/Sub, supporting 1000+ concurrent WebSocket connections with
-// <100ms synchronization latency across distributed backend instances.
-//
-// Designed a room-based event architecture and optimized message broadcasting,
-// reducing redundant event emissions by ~40% and improving throughput during
-// concurrent collaborative sessions.
-//
-// Integrated an AI-powered coding assistant using Gemini API, enabling
-// real-time code suggestions and debugging support, improving user
-// productivity and reducing manual effort during coding sessions.
-//
-// Redis commands used:
-// - PUBLISH: Send message to Redis
-// - SUBSCRIBE: Listen for messages
-// - SET/GET: Store temporary data
-// - ROOM: Manage room membership
-
-
-
-
-// ssh -i codecollab-key.pem ubuntu@34.207.131.98
-
-// if permission is not given by PC then simply run this commands.
-// icacls codecollab-key.pem /inheritance:r
-// icacls codecollab-key.pem /grant:r %USERNAME%:R
-
-// To rebundle the docker on the EC2 instance
-// after pulling from the repo simplly run below  2 commands
-
-// sudo docker-compose down
-// sudo docker - compose up--build - d
-
-
-
-
-
-// Built a real-time collaborative code editor using Socket.IO, supporting multi-user editing with low-latency synchronization.
-
-// Designed a scalable WebSocket architecture using Redis Pub/Sub, enabling cross-instance communication.
-
-// Implemented stable user identity using UUIDs to handle reconnections and prevent duplicate sessions.
-
-// Optimized backend performance by caching real-time updates in memory and batching database writes, reducing write load by >90%.
-
-// Deployed application on AWS EC2 using Docker and Docker Compose for scalable and consistent environments.
-
-// Designed CI/CD pipeline using GitHub Actions to automate build and deployment workflows.
-
-// Implemented IP-based rate limiting and request throttling to enhance backend security and prevent abuse.
